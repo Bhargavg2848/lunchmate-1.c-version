@@ -1,3 +1,14 @@
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+function Write-Utf8NoBom {
+  param([string]$Path, [string]$Content)
+  $fullPath = Join-Path $PWD $Path
+  $folder = Split-Path $fullPath -Parent
+  if (-not (Test-Path $folder)) { New-Item -ItemType Directory -Force -Path $folder | Out-Null }
+  [System.IO.File]::WriteAllText($fullPath, $Content, $utf8NoBom)
+}
+
+Write-Utf8NoBom "src/pages/NewOrder.jsx" @'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayDateString, addDaysToDateString } from '../lib/date'
@@ -386,3 +397,6 @@ export default function NewOrder() {
     </div>
   )
 }
+'@
+[System.IO.File]::WriteAllText("$PWD\src\pages\NewOrder.jsx", $NewOrderCode, $utf8NoBom)
+Write-Host "✅ NewOrder.jsx has been rewritten with cascading dropdowns and instant student verification." -ForegroundColor Green
