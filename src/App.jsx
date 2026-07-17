@@ -1,4 +1,5 @@
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
+import MenuManager from './pages/MenuManager.jsx'
 import NewOrder from './pages/NewOrder.jsx'
 import Deliveries from './pages/Deliveries.jsx'
 import Subscriptions from './pages/Subscriptions.jsx'
@@ -54,6 +55,14 @@ export default function App() {
               >
                 Subscriptions
               </NavLink>
+
+              {/* NEW MENU MANAGER LINK */}
+              <NavLink
+                to="/menu"
+                className={({ isActive }) => navClass(isActive)}
+              >
+                Menu & Pricing
+              </NavLink>
             </div>
           </div>
         </nav>
@@ -69,6 +78,9 @@ export default function App() {
               path="/subscriptions/:orderId"
               element={<SubscriptionDetails />}
             />
+            
+            {/* NEW MENU MANAGER ROUTE */}
+            <Route path="/menu" element={<MenuManager />} />
           </Routes>
         </main>
       </div>
