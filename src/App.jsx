@@ -3,6 +3,8 @@ import NewOrder from './pages/NewOrder.jsx'
 import Deliveries from './pages/Deliveries.jsx'
 import Subscriptions from './pages/Subscriptions.jsx'
 import SubscriptionDetails from './pages/SubscriptionDetails.jsx'
+import KitchenDashboard from './pages/KitchenDashboard.jsx'
+import DeliveryRoster from './pages/DeliveryRoster.jsx'
 
 function navClass(isActive) {
   return `px-3 py-1.5 rounded-md text-sm font-medium ${
@@ -29,7 +31,21 @@ export default function App() {
                 to="/deliveries"
                 className={({ isActive }) => navClass(isActive)}
               >
-                Today's Deliveries
+                Deliveries
+              </NavLink>
+
+              <NavLink
+                to="/kitchen"
+                className={({ isActive }) => navClass(isActive)}
+              >
+                Kitchen
+              </NavLink>
+
+              <NavLink
+                to="/roster"
+                className={({ isActive }) => navClass(isActive)}
+              >
+                Roster
               </NavLink>
 
               <NavLink
@@ -46,6 +62,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<NewOrder />} />
             <Route path="/deliveries" element={<Deliveries />} />
+            <Route path="/kitchen" element={<KitchenDashboard />} />
+            <Route path="/roster" element={<DeliveryRoster />} />
             <Route path="/subscriptions" element={<Subscriptions />} />
             <Route
               path="/subscriptions/:orderId"
