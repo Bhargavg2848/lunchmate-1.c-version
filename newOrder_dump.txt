@@ -36,7 +36,6 @@ function calculateDeliveryFee(distanceKm) {
 export default function NewOrder() {
   const [customer, setCustomer] = useState(null)
   const [orderType, setOrderType] = useState('subscription')
-  const [orderSource, setOrderSource] = useState('HM')
   const [groups, setGroups] = useState([])
   const [offers, setOffers] = useState([])
   const [menuItems, setMenuItems] = useState([])
@@ -117,8 +116,7 @@ export default function NewOrder() {
           p_amount_received: Number(amountReceived || 0),
           p_payment_mode: paymentMode,
           p_instructions: instructions,
-          p_snack_addon_offer_id: addonId || null,
-          p_order_source: orderSource
+          p_snack_addon_offer_id: addonId || null
         });
       } else {
         res = await supabase.rpc('create_special_one_time_order', {
@@ -131,8 +129,7 @@ export default function NewOrder() {
           p_amount_received: Number(amountReceived || 0),
           p_payment_mode: paymentMode,
           p_notes: instructions,
-          p_special_request_reason: specialReason,
-          p_order_source: orderSource
+          p_special_request_reason: specialReason
         });
       }
       if (res.error) throw res.error;
@@ -156,25 +153,11 @@ export default function NewOrder() {
           <CustomerPicker selectedCustomer={customer} onSelect={setCustomer} />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Order Type</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-sm"><input type="radio" checked={orderType === 'subscription'} onChange={() => setOrderType('subscription')} /> Subscription</label>
-              <label className="flex items-center gap-2 text-sm"><input type="radio" checked={orderType === 'one_time'} onChange={() => setOrderType('one_time')} /> Special One-Time</label>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Order Source</label>
-            <select value={orderSource} onChange={e => setOrderSource(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
-              <option value="HM">Home</option>
-              <option value="SH">School</option>
-              <option value="CG">College</option>
-              <option value="OF">Office</option>
-              <option value="HS">Hostel</option>
-              <option value="HP">Hospital</option>
-              <option value="HT">Hotel</option>
-            </select>
+        <div>
+          <label className="block text-sm font-medium mb-1">Order Type</label>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 text-sm"><input type="radio" checked={orderType === 'subscription'} onChange={() => setOrderType('subscription')} /> Subscription</label>
+            <label className="flex items-center gap-2 text-sm"><input type="radio" checked={orderType === 'one_time'} onChange={() => setOrderType('one_time')} /> Special One-Time</label>
           </div>
         </div>
 
@@ -283,3 +266,4 @@ export default function NewOrder() {
     </div>
   )
 }
+
