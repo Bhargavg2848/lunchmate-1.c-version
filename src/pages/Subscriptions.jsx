@@ -22,7 +22,7 @@ export default function Subscriptions() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      {/* Header Section with Buttons */}
+      
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">LUNCHMATE CUSTOMER TRACKER</h1>
         
@@ -31,7 +31,7 @@ export default function Subscriptions() {
             to="/tracker"
             className="bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
           >
-            ?? View Financial Tracker
+            View Financial Tracker
           </Link>
           <button
             type="button"
@@ -43,7 +43,7 @@ export default function Subscriptions() {
         </div>
       </div>
 
-      {/* Clean Table Layout */}
+      
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <table className="w-full text-left text-sm">
           <thead className="bg-gray-50 border-b">
@@ -77,4 +77,5 @@ export default function Subscriptions() {
     </div>
   );
 }
+
 
