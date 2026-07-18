@@ -58,7 +58,7 @@ export default function Subscriptions() {
         subscription.original_menu_item_name,
         subscription.current_future_menu_item_name,
         subscription.customer_id_string, 
-        subscription.order_id // Changed from subscription_order_id to match your DB
+        subscription.order_id // Will work perfectly once the view is updated
       ]
         .filter(Boolean)
         .join(' ')
@@ -128,7 +128,7 @@ export default function Subscriptions() {
         <div className="grid gap-4 md:grid-cols-2">
           {filteredSubscriptions.map((subscription) => (
             <article
-              key={subscription.id} // Safely use DB primary key here
+              key={subscription.subscription_order_id} 
               className="bg-white border rounded-lg p-5 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
@@ -229,7 +229,7 @@ export default function Subscriptions() {
                 </div>
 
                 <Link
-                  to={`/subscriptions/${subscription.id}`} // Routes safely via DB primary key
+                  to={`/subscriptions/${subscription.subscription_order_id}`}
                   className="bg-green-600 text-white rounded-md px-4 py-2 text-sm font-medium hover:bg-green-700 transition-colors shadow-sm"
                 >
                   Open Subscription
