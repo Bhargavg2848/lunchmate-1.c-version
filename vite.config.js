@@ -7,4 +7,7 @@ export default defineConfig({
     react(),
     cssInjectedByJsPlugin()
   ],
+  build: {
+    sourcemap: true
+  }
 })
