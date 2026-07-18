@@ -6,6 +6,7 @@ import Subscriptions from './pages/Subscriptions.jsx'
 import SubscriptionDetails from './pages/SubscriptionDetails.jsx'
 import KitchenDashboard from './pages/KitchenDashboard.jsx'
 import DeliveryRoster from './pages/DeliveryRoster.jsx'
+import CustomerTracker from './CustomerTracker.jsx' 
 
 function navClass(isActive) {
   return `px-3 py-1.5 rounded-md text-sm font-medium ${
@@ -56,7 +57,6 @@ export default function App() {
                 Subscriptions
               </NavLink>
 
-              {/* NEW MENU MANAGER LINK */}
               <NavLink
                 to="/menu"
                 className={({ isActive }) => navClass(isActive)}
@@ -79,7 +79,9 @@ export default function App() {
               element={<SubscriptionDetails />}
             />
             
-            {/* NEW MENU MANAGER ROUTE */}
+            {/* The Tracker Route remains so the button in Subscriptions works */}
+            <Route path="/tracker" element={<CustomerTracker />} />
+            
             <Route path="/menu" element={<MenuManager />} />
           </Routes>
         </main>

@@ -1,8 +1,24 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayDateString, addDaysToDateString } from '../lib/date'
 import CustomerPicker from '../components/CustomerPicker'
 import Alert from '../components/Alert'
+
+// Map Imports
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+
+// Fix for default Leaflet icons in React
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
+import markerIcon from 'leaflet/dist/images/marker-icon.png'
+import markerShadow from 'leaflet/dist/images/marker-shadow.png'
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+})
 
 const PAYMENT_MODES = [
   { value: 'cash', label: 'Cash' },
@@ -12,14 +28,33 @@ const PAYMENT_MODES = [
   { value: 'other', label: 'Other' },
 ]
 
+// --- EDITABLE DELIVERY RATES ---
+// Matches your: 1km=₹5, 1.1km=₹5.30, 2km=₹9, 3km=₹13 logic
+const DELIVERY_RATES = {
+  baseFee: 5.00,             // Fee for the first X kilometers
+  baseDistanceKm: 1.0,       // The distance included in the base fee
+  feePerExtraFullKm: 4.00,   // Fee for every FULL extra kilometer beyond the base
+  feePerExtra100m: 0.30      // Fee for every extra 0.1 km (100 meters)
+};
+
 function calculateDeliveryFee(distanceKm) {
-  const d = Number(distanceKm)
-  if (isNaN(d) || d < 0) return 0
-  const rounded = Math.ceil(d * 10) / 10
-  if (rounded <= 1.0) return 5.0
-  const extraKm = Math.floor(rounded) - 1
-  const hundreds = Math.round((rounded - Math.floor(rounded)) * 10)
-  return 5.0 + (extraKm * 4.0) + (hundreds * 0.3)
+  const d = Number(distanceKm);
+  if (isNaN(d) || d <= 0) return 0;
+  
+  // Round to nearest 1 decimal place (e.g., 1.14 -> 1.1, 1.15 -> 1.2)
+  const rounded = Math.round(d * 10) / 10;
+  
+  if (rounded <= DELIVERY_RATES.baseDistanceKm) {
+    return DELIVERY_RATES.baseFee;
+  }
+  
+  // Calculate extra full kilometers
+  const extraKm = Math.floor(rounded) - DELIVERY_RATES.baseDistanceKm;
+  
+  // Calculate remaining hundreds of meters
+  const hundreds = Math.round((rounded - Math.floor(rounded)) * 10);
+  
+  return DELIVERY_RATES.baseFee + (extraKm * DELIVERY_RATES.feePerExtraFullKm) + (hundreds * DELIVERY_RATES.feePerExtra100m);
 }
 
 export default function NewOrder() {
@@ -42,6 +77,12 @@ export default function NewOrder() {
   const [distance, setDistance] = useState('')
   const [instructions, setInstructions] = useState('')
 
+  // Map State
+  // Sriram Nagar Hub Coordinates (Exact match to Google Maps link)
+  const KITCHEN_COORDS = [16.9702, 82.2332] 
+  const [destinationCoords, setDestinationCoords] = useState(null)
+  const [routePath, setRoutePath] = useState([])
+
   // One Time State
   const [oneTimeMenuId, setOneTimeMenuId] = useState('')
   const [oneTimeAmount, setOneTimeAmount] = useState('')
@@ -51,8 +92,10 @@ export default function NewOrder() {
   const [amountReceived, setAmountReceived] = useState('')
   const [paymentMode, setPaymentMode] = useState('cash')
 
+  // UI State
   const [submitting, setSubmitting] = useState(false)
   const [verifying, setVerifying] = useState(false)
+  const [calculatingRoute, setCalculatingRoute] = useState(false) 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -70,13 +113,54 @@ export default function NewOrder() {
     load()
   }, [])
 
+  // Auto-trigger Routing Engine & Update Map
+  useEffect(() => {
+    async function autoCalculateDistance() {
+      const addressToRoute = customer?.address || customer?.customer_address
+      
+      if (addressToRoute) {
+        setCalculatingRoute(true)
+        setDestinationCoords(null)
+        setRoutePath([])
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('calculate-delivery', {
+            body: { destination: addressToRoute }
+          })
+          
+          if (!error && data) {
+            if (data.distance_km) setDistance(data.distance_km)
+            
+            // Map the coordinates returned from the backend API
+            if (data.destination_coords) {
+               setDestinationCoords([data.destination_coords.lat, data.destination_coords.lng])
+            }
+            if (data.route_points) {
+               setRoutePath(data.route_points)
+            }
+          }
+        } catch (err) {
+          console.error("Routing engine failed to auto-calculate:", err)
+        }
+        setCalculatingRoute(false)
+      }
+    }
+
+    if (customer) {
+      autoCalculateDistance()
+    } else {
+      setDistance('')
+      setDestinationCoords(null)
+      setRoutePath([])
+    }
+  }, [customer])
+
   // Derived Cascading Values
   const activeGroup = groups.find(g => g.id === groupId)
   const isStudent = activeGroup?.code === 'student'
   
   const mainOffers = offers.filter(o => o.pricing_group_id === groupId && (o.offer_kind === 'main_meal' || o.offer_kind === 'standalone_snack'))
   
-  // Extract unique menu items for the selected group
   const uniqueMenuItems = []
   const seenMenuIds = new Set()
   for (const offer of mainOffers) {
@@ -86,9 +170,7 @@ export default function NewOrder() {
     }
   }
 
-  // Filter plans available for the specifically selected menu item
   const availablePlansForMenu = mainOffers.filter(o => o.menu_item_id === selectedMenuId)
-  
   const activeOffer = offers.find(o => o.id === offerId)
   const availableAddons = offers.filter(o => o.pricing_group_id === groupId && o.offer_kind === 'snack_addon' && o.plan_id === activeOffer?.plan_id)
 
@@ -97,9 +179,7 @@ export default function NewOrder() {
   }, [isStudent])
 
   let deliveryFeePerMeal = 0
-  if (activeOffer?.delivery_fee_policy === 'distance') {
-    deliveryFeePerMeal = calculateDeliveryFee(distance)
-  } else if (orderType === 'one_time') {
+  if (activeOffer?.delivery_fee_policy === 'distance' || orderType === 'one_time') {
     deliveryFeePerMeal = calculateDeliveryFee(distance)
   }
 
@@ -127,6 +207,8 @@ export default function NewOrder() {
     setOneTimeMenuId('')
     setOneTimeAmount('')
     setSpecialReason('')
+    setDestinationCoords(null)
+    setRoutePath([])
   }
 
   async function handleVerifyStudent() {
@@ -338,11 +420,62 @@ export default function NewOrder() {
           {isStudent && <p className="text-xs text-amber-600 mt-1">Student plans are restricted to Lunch only.</p>}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Delivery Distance (km)</label>
-          <input type="number" min="0" step="0.1" value={distance} onChange={e => setDistance(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. 1.5" />
-          {deliveryFeePerMeal > 0 && <p className="text-xs text-gray-500 mt-1">Delivery Fee: ₹{deliveryFeePerMeal.toFixed(2)} per delivery</p>}
-          {activeOffer?.delivery_fee_policy === 'included' && <p className="text-xs text-green-600 mt-1">Delivery is included/free for this offer.</p>}
+        {/* DISTANCE INPUT & VISUAL MAP MODULE */}
+        <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+          <div className="flex justify-between items-end mb-2">
+            <label className="block text-sm font-bold text-gray-800">Routing & Delivery Distance (km)</label>
+            {calculatingRoute && (
+              <span className="text-xs font-semibold text-blue-600 animate-pulse">🛰️ Generating map...</span>
+            )}
+          </div>
+          
+          <input 
+            type="number" 
+            min="0" 
+            step="0.1" 
+            value={distance} 
+            onChange={e => setDistance(e.target.value)} 
+            className="w-full border rounded-md px-3 py-2 text-sm bg-white shadow-inner mb-3" 
+            placeholder="e.g. 1.5" 
+          />
+
+          {/* Render the Map Box */}
+          <div className="w-full h-48 bg-gray-200 rounded-md border border-gray-300 overflow-hidden relative z-0">
+            <MapContainer 
+              center={destinationCoords || KITCHEN_COORDS} 
+              zoom={13} 
+              style={{ height: '100%', width: '100%' }}
+              scrollWheelZoom={false}
+            >
+              <TileLayer
+                attribution='&copy; OpenStreetMap contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              
+              {/* Kitchen Marker */}
+              <Marker position={KITCHEN_COORDS}>
+                <Popup>Lunchmate Kitchen</Popup>
+              </Marker>
+
+              {/* Destination Marker */}
+              {destinationCoords && (
+                <Marker position={destinationCoords}>
+                  <Popup>Customer Location</Popup>
+                </Marker>
+              )}
+
+              {/* Route Line */}
+              {routePath.length > 0 && (
+                <Polyline positions={routePath} color="blue" weight={4} opacity={0.7} />
+              )}
+            </MapContainer>
+          </div>
+
+          {deliveryFeePerMeal > 0 && !calculatingRoute && (
+            <p className="text-sm font-bold text-indigo-700 mt-3 text-right">
+              Delivery Fee: ₹{deliveryFeePerMeal.toFixed(2)} / meal
+            </p>
+          )}
         </div>
 
         <div>
@@ -375,8 +508,8 @@ export default function NewOrder() {
           </div>
           <button 
             type="submit" 
-            disabled={submitting || needsVerification} 
-            className="bg-green-600 text-white px-5 py-2.5 rounded-md font-medium disabled:opacity-50"
+            disabled={submitting || needsVerification || calculatingRoute} 
+            className="bg-green-600 hover:bg-green-700 transition-colors text-white px-5 py-2.5 rounded-md font-medium disabled:opacity-50"
           >
             {submitting ? 'Processing...' : 'Log Order'}
           </button>
