@@ -1,11 +1,13 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { MapContainer, TileLayer, Marker } from 'react-leaflet'
-import 'leaflet/dist/leaflet.css'
+import mapboxgl from 'mapbox-gl'
+import 'mapbox-gl/dist/mapbox-gl.css'
 
-const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY
+// 1. Initialize Pure Mapbox (No Google needed!)
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
+mapboxgl.accessToken = MAPBOX_TOKEN
 const COORD_PATTERN = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/
-const KITCHEN_COORDS = [16.9702, 82.2332]
+const KITCHEN_COORDS = [16.968230, 82.234376]
 
 export default function CustomerPicker({ selectedCustomer, onSelect }) {
   const [query, setQuery] = useState('')
@@ -19,11 +21,15 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
   const [addressQuery, setAddressQuery] = useState('')
   const [addressSuggestions, setAddressSuggestions] = useState([])
   const [pin, setPin] = useState(null)
-  const [placeId, setPlaceId] = useState(null)
   const [geoLoading, setGeoLoading] = useState(false)
-  const sessionTokenRef = useRef(null)
   const debounceRef = useRef(null)
+  
+  // Mapbox Refs
+  const mapContainer = useRef(null)
+  const map = useRef(null)
+  const marker = useRef(null)
 
+  // Search Existing Customers
   useEffect(() => {
     if (!query.trim() || selectedCustomer) {
       setResults([])
@@ -42,72 +48,73 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
     return () => clearTimeout(timer)
   }, [query, selectedCustomer])
 
-  function newSessionToken() {
-    sessionTokenRef.current = crypto.randomUUID()
-    return sessionTokenRef.current
-  }
-
-  async function fetchSuggestions(text) {
-    if (!GOOGLE_API_KEY) {
-      console.warn('VITE_GOOGLE_PLACES_API_KEY is not set - address search disabled.')
+  // Mapbox Map Rendering
+  useEffect(() => {
+    if (!pin || !showNewForm) {
+      if (map.current) {
+        map.current.remove()
+        map.current = null
+        marker.current = null
+      }
       return
     }
-    if (!sessionTokenRef.current) newSessionToken()
+
+    if (mapContainer.current) {
+      if (!map.current) {
+        map.current = new mapboxgl.Map({
+          container: mapContainer.current,
+          style: 'mapbox://styles/mapbox/streets-v12',
+          center: [pin.lng, pin.lat],
+          zoom: 16
+        })
+
+        map.current.on('load', () => {
+          setTimeout(() => { if (map.current) map.current.resize(); }, 150);
+        });
+
+        marker.current = new mapboxgl.Marker({ draggable: true, color: '#ef4444' })
+          .setLngLat([pin.lng, pin.lat])
+          .addTo(map.current)
+
+        marker.current.on('dragend', () => {
+          const lngLat = marker.current.getLngLat()
+          setPin({ lat: lngLat.lat, lng: lngLat.lng })
+        })
+      } else {
+        map.current.flyTo({ center: [pin.lng, pin.lat] })
+        if (marker.current) {
+          marker.current.setLngLat([pin.lng, pin.lat])
+        }
+      }
+    }
+  }, [pin, showNewForm])
+
+  // Mapbox Geocoding API (Address Search)
+  async function fetchSuggestions(text) {
+    if (!MAPBOX_TOKEN) return;
     setGeoLoading(true)
     try {
-      const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': GOOGLE_API_KEY,
-        },
-        body: JSON.stringify({
-          input: text,
-          sessionToken: sessionTokenRef.current,
-          regionCode: 'IN',
-          locationBias: {
-            circle: {
-              center: { latitude: KITCHEN_COORDS[0], longitude: KITCHEN_COORDS[1] },
-              radius: 20000.0,
-            },
-          },
-        }),
-      })
+      // Prioritize results near the kitchen in India
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${MAPBOX_TOKEN}&country=in&proximity=${KITCHEN_COORDS[1]},${KITCHEN_COORDS[0]}&types=address,poi,neighborhood,locality&limit=5`;
+      const res = await fetch(url)
       const data = await res.json()
-      setAddressSuggestions(data.suggestions || [])
+      setAddressSuggestions(data.features || [])
     } catch (err) {
-      console.error('Places autocomplete failed:', err)
+      console.error('Mapbox search failed:', err)
     }
     setGeoLoading(false)
   }
 
-  async function selectSuggestion(suggestion) {
-    const id = suggestion.placePrediction.placeId
-    const label = suggestion.placePrediction.text.text
+  function selectSuggestion(feature) {
+    const label = feature.place_name
+    // Mapbox returns coordinates as [longitude, latitude]
+    const lng = feature.center[0]
+    const lat = feature.center[1]
+    
     setAddressQuery(label)
     setAddressSuggestions([])
-    setGeoLoading(true)
-    try {
-      const res = await fetch(
-        `https://places.googleapis.com/v1/places/${id}?sessionToken=${sessionTokenRef.current}`,
-        {
-          headers: {
-            'X-Goog-Api-Key': GOOGLE_API_KEY,
-            'X-Goog-FieldMask': 'location,formattedAddress',
-          },
-        }
-      )
-      const data = await res.json()
-      if (data.location) {
-        setPin({ lat: data.location.latitude, lng: data.location.longitude })
-        setPlaceId(id)
-        setNewCustomer((prev) => ({ ...prev, address: data.formattedAddress || label }))
-      }
-    } catch (err) {
-      console.error('Place details failed:', err)
-    }
-    sessionTokenRef.current = null
-    setGeoLoading(false)
+    setPin({ lat, lng })
+    setNewCustomer((prev) => ({ ...prev, address: label }))
   }
 
   function handleAddressChange(text) {
@@ -120,13 +127,11 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
       const lat = parseFloat(coordMatch[1])
       const lng = parseFloat(coordMatch[2])
       setPin({ lat, lng })
-      setPlaceId(null)
       setAddressSuggestions([])
       return
     }
 
     setPin(null)
-    setPlaceId(null)
     if (text.trim().length < 3) {
       setAddressSuggestions([])
       return
@@ -149,10 +154,11 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
         address: newCustomer.address.trim(),
         latitude: pin?.lat ?? null,
         longitude: pin?.lng ?? null,
-        place_id: placeId,
+        // Removed Google place_id as it is no longer relevant
       })
       .select()
       .single()
+    
     setCreating(false)
 
     if (error) {
@@ -164,7 +170,6 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
     setNewCustomer({ name: '', contact: '', address: '' })
     setAddressQuery('')
     setPin(null)
-    setPlaceId(null)
   }
 
   if (selectedCustomer) {
@@ -253,14 +258,14 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
             {geoLoading && <p className="text-xs text-gray-400 mt-1">Looking up...</p>}
             {addressSuggestions.length > 0 && (
               <div className="border rounded-md mt-1 max-h-48 overflow-y-auto bg-white shadow-sm absolute z-10 w-full">
-                {addressSuggestions.map((s) => (
+                {addressSuggestions.map((feature) => (
                   <button
                     type="button"
-                    key={s.placePrediction.placeId}
-                    onClick={() => selectSuggestion(s)}
+                    key={feature.id}
+                    onClick={() => selectSuggestion(feature)}
                     className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm border-b last:border-b-0"
                   >
-                    {s.placePrediction.text.text}
+                    {feature.place_name}
                   </button>
                 ))}
               </div>
@@ -271,19 +276,7 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
             <div>
               <p className="text-xs text-gray-500 mb-1">Drag the pin to fine-tune the exact spot:</p>
               <div className="w-full h-40 rounded-md overflow-hidden border">
-                <MapContainer center={[pin.lat, pin.lng]} zoom={16} style={{ height: '100%', width: '100%' }}>
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  <Marker
-                    position={[pin.lat, pin.lng]}
-                    draggable={true}
-                    eventHandlers={{
-                      dragend: (e) => {
-                        const { lat, lng } = e.target.getLatLng()
-                        setPin({ lat, lng })
-                      },
-                    }}
-                  />
-                </MapContainer>
+                <div ref={mapContainer} style={{ height: '100%', width: '100%' }} />
               </div>
             </div>
           )}
@@ -300,7 +293,7 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
             <button
               type="button"
               onClick={() => {
-                setShowNewForm(false); setError(''); setAddressQuery(''); setPin(null); setPlaceId(null)
+                setShowNewForm(false); setError(''); setAddressQuery(''); setPin(null);
               }}
               className="text-sm px-3 py-1.5 rounded-md border"
             >
