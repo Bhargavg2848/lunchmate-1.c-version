@@ -1,13 +1,30 @@
-import { defineConfig } from 'vite'
+﻿import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js'
 
 export default defineConfig({
-  plugins: [
-    react(),
-    cssInjectedByJsPlugin()
-  ],
+  plugins: [react()],
   build: {
-    sourcemap: true
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Split Mapbox into its own file
+          if (id.includes('mapbox-gl')) {
+            return 'mapbox';
+          }
+          // Split PDF generators into their own file
+          if (id.includes('jspdf') || id.includes('jspdf-autotable')) {
+            return 'pdf-generator';
+          }
+          // Split Supabase into its own file
+          if (id.includes('@supabase')) {
+            return 'supabase';
+          }
+          // Split React core into its own file
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'react-vendor';
+          }
+        }
+      }
+    }
   }
 })
