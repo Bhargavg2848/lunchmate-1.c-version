@@ -8,6 +8,8 @@ export default function DeliveryRoster() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [slotFilter, setSlotFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('name')
+  const [sortDirection, setSortDirection] = useState('asc')
 
   useEffect(() => {
     async function fetchRoster() {
@@ -84,9 +86,19 @@ export default function DeliveryRoster() {
   }, [deliveries])
 
   const filteredRoster = useMemo(() => {
-    if (slotFilter === 'all') return processedRoster
-    return processedRoster.filter(d => d.slot === slotFilter)
-  }, [processedRoster, slotFilter])
+    const scoped = slotFilter === 'all'
+      ? processedRoster
+      : processedRoster.filter(d => d.slot === slotFilter)
+
+    return [...scoped].sort((a, b) => {
+      const left = String(a[sortBy] || '').toLowerCase()
+      const right = String(b[sortBy] || '').toLowerCase()
+      if (left === right) return 0
+      return sortDirection === 'asc'
+        ? left.localeCompare(right)
+        : right.localeCompare(left)
+    })
+  }, [processedRoster, slotFilter, sortBy, sortDirection])
 
   if (loading) return (
     <div className="flex items-center justify-center p-12">
@@ -113,6 +125,25 @@ export default function DeliveryRoster() {
             <option value="all">All</option>
             <option value="lunch">Lunch</option>
             <option value="dinner">Dinner</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="name">Customer</option>
+            <option value="contact">Contact</option>
+            <option value="meal">Meal</option>
+            <option value="address">Address</option>
+            <option value="slot">Slot</option>
+          </select>
+          <select
+            value={sortDirection}
+            onChange={(e) => setSortDirection(e.target.value)}
+            className="border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
           </select>
           <button 
             onClick={() => window.print()}

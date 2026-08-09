@@ -8,6 +8,8 @@ export default function KitchenDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [slotFilter, setSlotFilter] = useState('all') // 'all', 'lunch', 'dinner'
+  const [sortBy, setSortBy] = useState('customerName')
+  const [sortDirection, setSortDirection] = useState('asc')
 
   useEffect(() => {
     async function fetchTodayMeals() {
@@ -87,9 +89,19 @@ export default function KitchenDashboard() {
   }, [deliveries])
 
   const filteredDeliveries = useMemo(() => {
-    if (slotFilter === 'all') return processedDeliveries
-    return processedDeliveries.filter(d => d.meal_slot === slotFilter)
-  }, [processedDeliveries, slotFilter])
+    const scoped = slotFilter === 'all'
+      ? processedDeliveries
+      : processedDeliveries.filter(d => d.meal_slot === slotFilter)
+
+    return [...scoped].sort((a, b) => {
+      const left = String(a[sortBy] || '').toLowerCase()
+      const right = String(b[sortBy] || '').toLowerCase()
+      if (left === right) return 0
+      return sortDirection === 'asc'
+        ? left.localeCompare(right)
+        : right.localeCompare(left)
+    })
+  }, [processedDeliveries, slotFilter, sortBy, sortDirection])
 
   const totals = useMemo(() => {
     return filteredDeliveries.reduce((acc, d) => {
@@ -125,6 +137,24 @@ export default function KitchenDashboard() {
             <option value="all">All Slots</option>
             <option value="lunch">Lunch</option>
             <option value="dinner">Dinner</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500"
+          >
+            <option value="customerName">Customer</option>
+            <option value="meal_name_snapshot">Meal</option>
+            <option value="displayType">Type</option>
+            <option value="meal_slot">Slot</option>
+          </select>
+          <select
+            value={sortDirection}
+            onChange={(e) => setSortDirection(e.target.value)}
+            className="border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-green-500"
+          >
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
           </select>
         </div>
       </div>

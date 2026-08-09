@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayDateString } from '../lib/date'
 import Alert from '../components/Alert'
@@ -19,6 +19,8 @@ export default function Deliveries() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [updatingId, setUpdatingId] = useState(null)
+  const [sortBy, setSortBy] = useState('distance')
+  const [sortDirection, setSortDirection] = useState('asc')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -39,6 +41,7 @@ export default function Deliveries() {
           order_type,
           plan_credits,
           credits_used,
+          delivery_distance_km,
           subscription_instructions,
           customers ( name, contact, address )
         )
@@ -59,6 +62,36 @@ export default function Deliveries() {
   useEffect(() => {
     load()
   }, [load])
+
+  const visibleDeliveries = useMemo(() => {
+    return [...deliveries].sort((a, b) => {
+      if (sortBy === 'distance') {
+        const distanceA = Number(a.orders?.delivery_distance_km ?? Number.POSITIVE_INFINITY)
+        const distanceB = Number(b.orders?.delivery_distance_km ?? Number.POSITIVE_INFINITY)
+        if (distanceA === distanceB) return 0
+        return sortDirection === 'asc' ? distanceA - distanceB : distanceB - distanceA
+      }
+
+      const customerA = a.orders?.customers?.name || ''
+      const customerB = b.orders?.customers?.name || ''
+      const valueA = sortBy === 'customer'
+        ? customerA
+        : sortBy === 'order_type'
+          ? a.orders?.order_type || ''
+          : a[sortBy] || ''
+      const valueB = sortBy === 'customer'
+        ? customerB
+        : sortBy === 'order_type'
+          ? b.orders?.order_type || ''
+          : b[sortBy] || ''
+      const left = String(valueA).toLowerCase()
+      const right = String(valueB).toLowerCase()
+      if (left === right) return 0
+      return sortDirection === 'asc'
+        ? left.localeCompare(right)
+        : right.localeCompare(left)
+    })
+  }, [deliveries, sortBy, sortDirection])
 
   async function updateStatus(delivery, newStatus) {
     const order = delivery.orders
@@ -114,6 +147,27 @@ export default function Deliveries() {
         >
           Refresh
         </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="border rounded-md px-3 py-2 text-sm"
+          >
+            <option value="customer">Customer</option>
+            <option value="distance">Hub distance</option>
+            <option value="meal_name_snapshot">Meal</option>
+            <option value="status">Status</option>
+            <option value="order_type">Order Type</option>
+          </select>
+          <select
+            value={sortDirection}
+            onChange={(e) => setSortDirection(e.target.value)}
+            className="border rounded-md px-3 py-2 text-sm"
+          >
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+          </select>
+        </div>
       </div>
 
       <Alert type="error" message={error} onClose={() => setError('')} />
@@ -139,7 +193,7 @@ export default function Deliveries() {
             </thead>
 
             <tbody>
-              {deliveries.map((delivery) => {
+              {visibleDeliveries.map((delivery) => {
                 const order = delivery.orders
                 const customer = order?.customers
                 const isPending = delivery.status === 'pending'
@@ -151,6 +205,9 @@ export default function Deliveries() {
                       <p className="font-medium">{customer?.name || '-'}</p>
                       <p className="text-xs text-gray-500">{customer?.contact || ''}</p>
                       <p className="text-xs text-gray-400 mt-1">{customer?.address || ''}</p>
+                      <p className="text-xs text-indigo-600 mt-1">
+                        Distance: {Number(order?.delivery_distance_km || 0).toFixed(1)} km
+                      </p>
                     </td>
 
                     <td className="px-4 py-3">

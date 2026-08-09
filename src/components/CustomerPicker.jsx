@@ -14,6 +14,7 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
   const [showNewForm, setShowNewForm] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
   const [newCustomer, setNewCustomer] = useState({ name: '', contact: '', address: '' })
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
@@ -146,18 +147,28 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
       return
     }
     setCreating(true)
-    const { data, error } = await supabase
-      .from('customers')
-      .insert({
-        name: newCustomer.name.trim(),
-        contact: newCustomer.contact.trim(),
-        address: newCustomer.address.trim(),
-        latitude: pin?.lat ?? null,
-        longitude: pin?.lng ?? null,
-        // Removed Google place_id as it is no longer relevant
-      })
-      .select()
-      .single()
+    const payload = {
+      name: newCustomer.name.trim(),
+      contact: newCustomer.contact.trim(),
+      address: newCustomer.address.trim(),
+      latitude: pin?.lat ?? null,
+      longitude: pin?.lng ?? null,
+    }
+
+    const request = isEditMode
+      ? supabase
+          .from('customers')
+          .update(payload)
+          .eq('id', selectedCustomer.id)
+          .select()
+          .single()
+      : supabase
+          .from('customers')
+          .insert(payload)
+          .select()
+          .single()
+
+    const { data, error } = await request
     
     setCreating(false)
 
@@ -167,12 +178,13 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
     }
     onSelect(data)
     setShowNewForm(false)
+    setIsEditMode(false)
     setNewCustomer({ name: '', contact: '', address: '' })
     setAddressQuery('')
     setPin(null)
   }
 
-  if (selectedCustomer) {
+  if (selectedCustomer && !showNewForm) {
     return (
       <div className="border rounded-md p-3 bg-green-50 border-green-200 flex justify-between items-center">
         <div>
@@ -184,9 +196,35 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
             <p className="text-xs text-amber-600 mt-0.5">No pinned location on file - distance must be entered manually.</p>
           )}
         </div>
-        <button type="button" onClick={() => onSelect(null)} className="text-xs text-red-600 hover:underline">
-          Change
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setIsEditMode(true)
+              setShowNewForm(true)
+              setNewCustomer({
+                name: selectedCustomer.name || '',
+                contact: selectedCustomer.contact || '',
+                address: selectedCustomer.address || '',
+              })
+              setAddressQuery(selectedCustomer.address || '')
+              if (selectedCustomer.latitude && selectedCustomer.longitude) {
+                setPin({
+                  lat: Number(selectedCustomer.latitude),
+                  lng: Number(selectedCustomer.longitude),
+                })
+              } else {
+                setPin(null)
+              }
+            }}
+            className="text-xs text-blue-700 hover:underline"
+          >
+            Edit Details
+          </button>
+          <button type="button" onClick={() => onSelect(null)} className="text-xs text-red-600 hover:underline">
+            Change
+          </button>
+        </div>
       </div>
     )
   }
@@ -223,7 +261,10 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
           )}
           <button
             type="button"
-            onClick={() => setShowNewForm(true)}
+            onClick={() => {
+              setIsEditMode(false)
+              setShowNewForm(true)
+            }}
             className="text-xs text-green-700 font-medium mt-2 hover:underline"
           >
             + Create new customer
@@ -288,12 +329,12 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
               onClick={handleCreate}
               className="bg-green-600 text-white text-sm px-3 py-1.5 rounded-md disabled:opacity-50"
             >
-              {creating ? 'Saving...' : 'Save Customer'}
+              {creating ? 'Saving...' : isEditMode ? 'Update Customer' : 'Save Customer'}
             </button>
             <button
               type="button"
               onClick={() => {
-                setShowNewForm(false); setError(''); setAddressQuery(''); setPin(null);
+                setShowNewForm(false); setError(''); setAddressQuery(''); setPin(null); setIsEditMode(false);
               }}
               className="text-sm px-3 py-1.5 rounded-md border"
             >
