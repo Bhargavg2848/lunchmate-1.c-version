@@ -19,7 +19,7 @@ export default function Deliveries() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [updatingId, setUpdatingId] = useState(null)
-  const [sortBy, setSortBy] = useState('customer')
+  const [sortBy, setSortBy] = useState('distance')
   const [sortDirection, setSortDirection] = useState('asc')
 
   const load = useCallback(async () => {
@@ -41,6 +41,7 @@ export default function Deliveries() {
           order_type,
           plan_credits,
           credits_used,
+          delivery_distance_km,
           subscription_instructions,
           customers ( name, contact, address )
         )
@@ -64,6 +65,13 @@ export default function Deliveries() {
 
   const visibleDeliveries = useMemo(() => {
     return [...deliveries].sort((a, b) => {
+      if (sortBy === 'distance') {
+        const distanceA = Number(a.orders?.delivery_distance_km ?? Number.POSITIVE_INFINITY)
+        const distanceB = Number(b.orders?.delivery_distance_km ?? Number.POSITIVE_INFINITY)
+        if (distanceA === distanceB) return 0
+        return sortDirection === 'asc' ? distanceA - distanceB : distanceB - distanceA
+      }
+
       const customerA = a.orders?.customers?.name || ''
       const customerB = b.orders?.customers?.name || ''
       const valueA = sortBy === 'customer'
@@ -146,6 +154,7 @@ export default function Deliveries() {
             className="border rounded-md px-3 py-2 text-sm"
           >
             <option value="customer">Customer</option>
+            <option value="distance">Hub distance</option>
             <option value="meal_name_snapshot">Meal</option>
             <option value="status">Status</option>
             <option value="order_type">Order Type</option>
@@ -196,6 +205,9 @@ export default function Deliveries() {
                       <p className="font-medium">{customer?.name || '-'}</p>
                       <p className="text-xs text-gray-500">{customer?.contact || ''}</p>
                       <p className="text-xs text-gray-400 mt-1">{customer?.address || ''}</p>
+                      <p className="text-xs text-indigo-600 mt-1">
+                        Distance: {Number(order?.delivery_distance_km || 0).toFixed(1)} km
+                      </p>
                     </td>
 
                     <td className="px-4 py-3">

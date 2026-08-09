@@ -100,23 +100,34 @@ export async function generateSubscriptionInvoice(subscription) {
     doc.text(doc.splitTextToSize(subscription.customer_address || 'N/A', 80), 118, 72);
 
     // MATH
-    const totalAmount = Number(subscription.original_total_amount || 0);
+    const originalTotalAmount = Number(subscription.original_total_amount || 0);
+    const revisedTotalAmount = Number(subscription.revised_total_amount || subscription.total_amount || originalTotalAmount);
     const amountPaid = Number(subscription.amount_received || 0);
     const balanceDue = Number(subscription.amount_due || 0);
     const credits = Number(subscription.plan_credits || 30);
     
-    const deliveryFeePerMeal = calculateDeliveryFee(distance);
-    const totalDeliveryCharge = deliveryFeePerMeal * credits;
-    const subscriptionPrice = Math.max(0, totalAmount - totalDeliveryCharge - addonPrice);
+    const computedDeliveryFeePerMeal = calculateDeliveryFee(distance);
+    const computedTotalDeliveryCharge = computedDeliveryFeePerMeal * credits;
+    const deliveryFeePerMeal = Number(subscription.delivery_fee_per_delivery || computedDeliveryFeePerMeal);
+    const totalDeliveryCharge = Number(subscription.delivery_total_amount || computedTotalDeliveryCharge);
+    const subscriptionFoodAmount = Number(
+      subscription.food_total_amount ??
+      Math.max(0, revisedTotalAmount - totalDeliveryCharge - addonPrice)
+    );
+    const subtotalExcludingTax = subscriptionFoodAmount + totalDeliveryCharge + addonPrice;
+    const taxAmount = revisedTotalAmount - subtotalExcludingTax;
+    const grandTotal = subtotalExcludingTax + taxAmount;
 
     // TABLE
     const bodyRows = [
-      ["Subscription Plan", `${subscription.plan_name || 'Plan'} (${credits} Meals)\n${subscription.original_menu_item_name || ''}`, `Rs. ${subscriptionPrice.toFixed(2)}`]
+      ["Subscription Fee", `${subscription.plan_name || 'Plan'} (${credits} Meals)\n${subscription.original_menu_item_name || ''}`, `Rs. ${subscriptionFoodAmount.toFixed(2)}`]
     ];
     if (addonPrice > 0) {
         bodyRows.push(["Snack Add-on", addonName, `Rs. ${addonPrice.toFixed(2)}`]);
     }
     bodyRows.push(["Delivery Charges", `Rate: Rs. ${deliveryFeePerMeal.toFixed(2)} x ${credits}`, `Rs. ${totalDeliveryCharge.toFixed(2)}`]);
+    bodyRows.push(["GST / Tax", "Applied on subscription and delivery", `Rs. ${taxAmount.toFixed(2)}`]);
+    bodyRows.push(["Grand Total", "Inclusive of subscription, delivery and tax", `Rs. ${grandTotal.toFixed(2)}`]);
 
     autoTable(doc, {
       startY: 97,
@@ -131,13 +142,14 @@ export async function generateSubscriptionInvoice(subscription) {
 
     // TOTALS BOX
     const finalY = doc.lastAutoTable.finalY + 15;
-    doc.setFillColor(243, 244, 246); doc.rect(100, finalY - 8, 95, 35, 'F');
+    doc.setFillColor(243, 244, 246); doc.rect(100, finalY - 8, 95, 45, 'F');
     doc.setFontSize(11); doc.setTextColor(50, 50, 50);
-    doc.text('Total Value:', 105, finalY); doc.text(`Rs. ${totalAmount.toFixed(2)}`, 185, finalY, { align: 'right' });
-    doc.text('Amount Received:', 105, finalY + 8); doc.text(`Rs. ${amountPaid.toFixed(2)}`, 185, finalY + 8, { align: 'right' });
+    doc.text('Original Total:', 105, finalY); doc.text(`Rs. ${originalTotalAmount.toFixed(2)}`, 185, finalY, { align: 'right' });
+    doc.text('Revised Total:', 105, finalY + 8); doc.text(`Rs. ${revisedTotalAmount.toFixed(2)}`, 185, finalY + 8, { align: 'right' });
+    doc.text('Amount Received:', 105, finalY + 16); doc.text(`Rs. ${amountPaid.toFixed(2)}`, 185, finalY + 16, { align: 'right' });
     doc.setFontSize(12); doc.setFont('helvetica', 'bold');
     doc.setTextColor(balanceDue > 0 ? 220 : 22, balanceDue > 0 ? 38 : 163, balanceDue > 0 ? 38 : 74);
-    doc.text('Balance Due:', 105, finalY + 18); doc.text(`Rs. ${balanceDue.toFixed(2)}`, 185, finalY + 18, { align: 'right' });
+    doc.text('Balance Due:', 105, finalY + 28); doc.text(`Rs. ${balanceDue.toFixed(2)}`, 185, finalY + 28, { align: 'right' });
 
     // FOOTER
     doc.setTextColor(150, 150, 150); doc.setFontSize(9); doc.setFont('helvetica', 'italic');
