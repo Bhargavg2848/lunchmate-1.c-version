@@ -55,6 +55,7 @@ export default function NewOrder() {
   // Logistics & Payment
   const [mealSlot, setMealSlot] = useState('lunch')
   const [startDate, setStartDate] = useState(addDaysToDateString(todayDateString(), 1))
+  const [allowPastDate, setAllowPastDate] = useState(false)
   const [distance, setDistance] = useState('')
   const [calculatingDistance, setCalculatingDistance] = useState(false)
   const [instructions, setInstructions] = useState('')
@@ -413,7 +414,15 @@ export default function NewOrder() {
 
         <div>
             <label className="block text-sm font-medium mb-1">Start Date</label>
-            <input type="date" value={startDate} min={todayDateString()} onChange={e => setStartDate(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" />
+            <input type="date" value={startDate} min={allowPastDate ? undefined : todayDateString()} onChange={e => setStartDate(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" />
+            <label className="mt-2 inline-flex items-center gap-2 text-xs text-gray-600">
+              <input
+                type="checkbox"
+                checked={allowPastDate}
+                onChange={(e) => setAllowPastDate(e.target.checked)}
+              />
+              Allow past date entry for backdated orders
+            </label>
         </div>
         
         <div>
