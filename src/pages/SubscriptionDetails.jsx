@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { todayDateString } from '../lib/date'
@@ -291,6 +291,7 @@ export default function SubscriptionDetails() {
     setSkipReason('')
   }
 
+  // --- THIS IS THE UPDATED FUNCTION ---
   function saveAmountReceived() {
     const hasAddAmount = addAmountReceived.trim().length > 0
     const addValue = Number(addAmountReceived)
@@ -308,15 +309,37 @@ export default function SubscriptionDetails() {
 
     const currentTotal = Number(overview?.amount_received || 0)
     const newTotal = hasAddAmount ? currentTotal + addValue : exactValue
+    const revisedTotal = Number(overview?.revised_total_amount || 0)
+    const newDue = Math.max(0, revisedTotal - newTotal)
+    const paidAmount = hasAddAmount ? addValue : (newTotal - currentTotal)
 
     execute(
       'payment',
-      () =>
-        supabase.rpc('set_order_amount_received', {
+      async () => {
+        // 1. Update the overall totals first
+        const { error: rpcError } = await supabase.rpc('set_order_amount_received', {
           p_order_id: orderId,
           p_amount_received: newTotal,
           p_payment_mode: paymentMode,
-        }),
+        })
+        
+        if (rpcError) return { error: rpcError }
+
+        // 2. Insert a new record into the transaction history
+        if (paidAmount !== 0) {
+          const { error: txError } = await supabase.from('payment_transactions').insert([{
+            order_id: orderId,
+            amount_paid: paidAmount,
+            payment_mode: paymentMode,
+            total_received: newTotal,
+            amount_due: newDue,
+            notes: hasAddAmount ? 'Added payment' : 'Manual total override'
+          }])
+          if (txError) return { error: txError }
+        }
+
+        return { error: null }
+      },
       hasAddAmount
         ? `Added ${money(addValue)} payment.`
         : 'Amount received and due amount updated.'
