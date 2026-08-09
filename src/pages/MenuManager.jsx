@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import Alert from '../components/Alert'
 
@@ -207,7 +207,7 @@ export default function MenuManager() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Price (Rs.)</label>
               <input required type="number" min="0" value={newOffer.package_price} onChange={e => setNewOffer({...newOffer, package_price: e.target.value})} className="w-full border rounded-md px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500" />
             </div>
 
@@ -234,7 +234,7 @@ export default function MenuManager() {
                 <th className="px-6 py-4">Offer Code / Details</th>
                 <th className="px-6 py-4">Base Plan</th>
                 <th className="px-6 py-4">Credits</th>
-                <th className="px-6 py-4">Price (₹)</th>
+                <th className="px-6 py-4">Price (Rs.)</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -264,7 +264,7 @@ export default function MenuManager() {
                     {editingId === offer.id ? (
                       <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-24 border rounded px-2 py-1 text-sm focus:ring-green-500 focus:border-green-500" />
                     ) : (
-                      <span className="font-bold text-green-700">₹{offer.package_price}</span>
+                      <span className="font-bold text-green-700">Rs. {offer.package_price}</span>
                     )}
                   </td>
 

@@ -17,17 +17,13 @@ const PAYMENT_MODES = [
   { value: 'other', label: 'Other' },
 ]
 
-const DELIVERY_RATES = { baseFee: 5.00, baseDistanceKm: 1.0, feePerExtraFullKm: 4.00, feePerExtra100m: 0.30 };
+const DELIVERY_RATES = { baseFee: 8.00, ratePerKm: 8.00 };
 const KITCHEN_COORDS = { lat: 16.968230, lng: 82.234376 };
 
 function calculateDeliveryFee(distanceKm) {
   const d = Number(distanceKm);
   if (isNaN(d) || d <= 0) return 0;
-  const rounded = Math.round(d * 10) / 10;
-  if (rounded <= DELIVERY_RATES.baseDistanceKm) return DELIVERY_RATES.baseFee;
-  const extraKm = Math.floor(rounded) - DELIVERY_RATES.baseDistanceKm;
-  const hundreds = Math.round((rounded - Math.floor(rounded)) * 10);
-  return DELIVERY_RATES.baseFee + (extraKm * DELIVERY_RATES.feePerExtraFullKm) + (hundreds * DELIVERY_RATES.feePerExtra100m);
+  return DELIVERY_RATES.baseFee + (d * DELIVERY_RATES.ratePerKm);
 }
 
 export default function NewOrder() {
@@ -35,6 +31,7 @@ export default function NewOrder() {
   const [customer, setCustomer] = useState(null)
   const [orderType, setOrderType] = useState('subscription')
   const [orderSource, setOrderSource] = useState('HM')
+  const [planMode, setPlanMode] = useState('preset') // 'preset' | 'custom'
   
   // Data State
   const [groups, setGroups] = useState([])
@@ -47,6 +44,10 @@ export default function NewOrder() {
   const [offerId, setOfferId] = useState('')
   const [addonId, setAddonId] = useState('')
   
+  // Custom Plan Selections
+  const [customDays, setCustomDays] = useState('')
+  const [customMealPrice, setCustomMealPrice] = useState('')
+
   // One-Time Selections
   const [oneTimeMenuId, setOneTimeMenuId] = useState('')
   const [oneTimeAmount, setOneTimeAmount] = useState('')
@@ -173,19 +174,24 @@ export default function NewOrder() {
   }, [isStudent])
 
   let deliveryFeePerMeal = calculateDeliveryFee(distance)
-  if (isStudent) deliveryFeePerMeal = 0; 
+  if (isStudent && planMode === 'preset') deliveryFeePerMeal = 0; 
 
   let totalAmount = 0
-  if (orderType === 'subscription' && activeOffer) {
-    totalAmount = Number(activeOffer.package_price) + (deliveryFeePerMeal * activeOffer.included_credits)
-    if (addonId) {
-        totalAmount += Number(offers.find(o => o.id === addonId)?.package_price || 0)
+  if (orderType === 'subscription') {
+    if (planMode === 'preset' && activeOffer) {
+        totalAmount = Number(activeOffer.package_price) + (deliveryFeePerMeal * activeOffer.included_credits)
+        if (addonId) {
+            totalAmount += Number(offers.find(o => o.id === addonId)?.package_price || 0)
+        }
+    } else if (planMode === 'custom' && customDays) {
+        const days = Number(customDays) || 0;
+        const mealPrice = Number(customMealPrice) || 0;
+        totalAmount = (mealPrice + deliveryFeePerMeal) * days;
     }
   } else if (orderType === 'one_time') {
     totalAmount = Number(oneTimeAmount || 0) + deliveryFeePerMeal
   }
 
-  // --- NEW FUNCTION: VERIFY STUDENT INLINE ---
   async function handleVerifyStudent() {
     if (!customer?.id) return;
     setVerifying(true);
@@ -197,7 +203,6 @@ export default function NewOrder() {
       
       if (updateError) throw updateError;
       
-      // Update local state instantly so warning disappears
       setCustomer({ ...customer, student_verification_status: 'verified' });
       setSuccess('Customer successfully marked as verified!');
       setTimeout(() => setSuccess(''), 3000);
@@ -220,21 +225,29 @@ export default function NewOrder() {
       return
     }
 
+    if (orderType === 'subscription' && planMode === 'custom' && (!selectedMenuId || !customDays)) {
+      setError('Please select a menu item and enter the number of days for the custom plan.')
+      setSubmitting(false)
+      return
+    }
+
     try {
       let res;
       if (orderType === 'subscription') {
         res = await supabase.rpc('create_catalog_subscription', {
           p_customer_id: customer.id,
-          p_offer_id: offerId || null,
+          p_offer_id: planMode === 'preset' ? (offerId || null) : null,
           p_meal_slot: mealSlot || null,
           p_start_date: startDate || null, 
           p_delivery_distance_km: Number(distance || 0),
           p_amount_received: Number(amountReceived || 0),
           p_payment_mode: paymentMode || null,
           p_instructions: instructions || null,
-          p_snack_addon_offer_id: addonId || null,
+          p_snack_addon_offer_id: planMode === 'preset' ? (addonId || null) : null,
           p_order_source: orderSource,
-          p_original_total_amount: Number(totalAmount || 0)
+          p_original_total_amount: Number(totalAmount || 0),
+          p_custom_days: planMode === 'custom' ? Number(customDays) : null,
+          p_custom_menu_item_id: planMode === 'custom' ? (selectedMenuId || null) : null
         });
       } else {
         res = await supabase.rpc('create_special_one_time_order', {
@@ -257,6 +270,7 @@ export default function NewOrder() {
       
       setSuccess('Order logged successfully!'); 
       setCustomer(null); setOfferId(''); setDistance(''); setInstructions(''); setAmountReceived('');
+      setCustomDays(''); setCustomMealPrice(''); setPlanMode('preset'); setSelectedMenuId('');
     } catch (err) { 
       setError(err.message) 
     }
@@ -283,8 +297,7 @@ export default function NewOrder() {
             </div>
           )}
           
-          {/* --- INLINE VERIFY BUTTON UI ADDED HERE --- */}
-          {customer && isStudent && customer.student_verification_status !== 'verified' && (
+          {customer && isStudent && customer.student_verification_status !== 'verified' && planMode === 'preset' && (
              <div className="bg-red-50 border border-red-200 p-3 rounded-md mt-2 flex justify-between items-center">
                 <p className="text-xs text-red-700 font-bold">
                    Warning: You are selecting a Student Plan, but this customer is not verified!
@@ -329,39 +342,75 @@ export default function NewOrder() {
 
         {orderType === 'subscription' ? (
           <div className="p-4 bg-gray-50 rounded-lg border space-y-3">
-            <label className="block text-sm font-medium">1. Pricing Group</label>
-            <select value={groupId} onChange={e => {setGroupId(e.target.value); setSelectedMenuId(''); setOfferId('');}} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
-                <option value="">Select Group...</option>
-                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-            
-            {groupId && (
+            <div className="flex gap-6 mb-2 border-b pb-4">
+              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 cursor-pointer">
+                <input type="radio" checked={planMode === 'preset'} onChange={() => setPlanMode('preset')} className="text-green-600 focus:ring-green-500" />
+                Standard Plans
+              </label>
+              <label className="flex items-center gap-2 text-sm font-bold text-gray-700 cursor-pointer">
+                <input type="radio" checked={planMode === 'custom'} onChange={() => {setPlanMode('custom'); setSelectedMenuId('');}} className="text-green-600 focus:ring-green-500" />
+                Custom Duration
+              </label>
+            </div>
+
+            {planMode === 'preset' ? (
               <>
-                <label className="block text-sm font-medium mt-2">2. Menu Item</label>
-                <select value={selectedMenuId} onChange={e => {setSelectedMenuId(e.target.value); setOfferId('');}} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
-                    <option value="">Select Menu...</option>
-                    {uniqueMenuItems.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                <label className="block text-sm font-medium">1. Pricing Group</label>
+                <select value={groupId} onChange={e => {setGroupId(e.target.value); setSelectedMenuId(''); setOfferId('');}} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
+                    <option value="">Select Group...</option>
+                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
+                
+                {groupId && (
+                  <>
+                    <label className="block text-sm font-medium mt-2">2. Menu Item</label>
+                    <select value={selectedMenuId} onChange={e => {setSelectedMenuId(e.target.value); setOfferId('');}} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
+                        <option value="">Select Menu...</option>
+                        {uniqueMenuItems.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                  </>
+                )}
+                
+                {selectedMenuId && (
+                  <>
+                    <label className="block text-sm font-medium mt-2">3. Plan Duration & Price</label>
+                    <select value={offerId} onChange={e => setOfferId(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
+                        <option value="">Select Plan...</option>
+                        {availablePlansForMenu.map(o => <option key={o.id} value={o.id}>{o.plans?.name} - Rs. {o.package_price}</option>)}
+                    </select>
+                  </>
+                )}
+                
+                {activeOffer && availableAddons.length > 0 && (
+                  <div className="border-t pt-3 mt-3">
+                    <label className="block text-sm font-medium mb-1">4. Snack Add-on (Optional)</label>
+                    <select value={addonId} onChange={e => setAddonId(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
+                      <option value="">None</option>
+                      {availableAddons.map(o => <option key={o.id} value={o.id}>{o.menu_items?.name} (+ Rs. {o.package_price})</option>)}
+                    </select>
+                  </div>
+                )}
               </>
-            )}
-            
-            {selectedMenuId && (
-              <>
-                <label className="block text-sm font-medium mt-2">3. Plan Duration & Price</label>
-                <select value={offerId} onChange={e => setOfferId(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
-                    <option value="">Select Plan...</option>
-                    {availablePlansForMenu.map(o => <option key={o.id} value={o.id}>{o.plans?.name} - ₹{o.package_price}</option>)}
-                </select>
-              </>
-            )}
-            
-            {activeOffer && availableAddons.length > 0 && (
-              <div className="border-t pt-3 mt-3">
-                <label className="block text-sm font-medium mb-1">4. Snack Add-on (Optional)</label>
-                <select value={addonId} onChange={e => setAddonId(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
-                  <option value="">None</option>
-                  {availableAddons.map(o => <option key={o.id} value={o.id}>{o.menu_items?.name} (+ ₹{o.package_price})</option>)}
-                </select>
+            ) : (
+              <div className="pt-2 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Select Menu Item</label>
+                  <select value={selectedMenuId} onChange={e => setSelectedMenuId(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
+                      <option value="">Select Item...</option>
+                      {menuItems.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Total Days</label>
+                    <input type="number" min="1" placeholder="e.g. 16" value={customDays} onChange={e => setCustomDays(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Food Price per Meal</label>
+                    <input type="number" min="0" placeholder="e.g. 120" value={customMealPrice} onChange={e => setCustomMealPrice(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white" />
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -373,7 +422,7 @@ export default function NewOrder() {
                 {menuItems.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
             
-            <label className="block text-sm font-medium mt-2">Approved Food Amount (₹)</label>
+            <label className="block text-sm font-medium mt-2">Approved Food Amount (Rs.)</label>
             <input type="number" placeholder="Amount" value={oneTimeAmount} onChange={e => setOneTimeAmount(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white" />
           </div>
         )}
@@ -384,11 +433,11 @@ export default function NewOrder() {
               <label className="flex items-center gap-2 text-sm">
                   <input type="radio" checked={mealSlot === 'lunch'} onChange={() => setMealSlot('lunch')} /> Lunch
               </label>
-              <label className={`flex items-center gap-2 text-sm ${isStudent ? 'text-gray-400' : ''}`}>
-                  <input type="radio" checked={mealSlot === 'dinner'} onChange={() => setMealSlot('dinner')} disabled={isStudent} /> Dinner
+              <label className={`flex items-center gap-2 text-sm ${isStudent && planMode === 'preset' ? 'text-gray-400' : ''}`}>
+                  <input type="radio" checked={mealSlot === 'dinner'} onChange={() => setMealSlot('dinner')} disabled={isStudent && planMode === 'preset'} /> Dinner
               </label>
           </div>
-          {isStudent && <p className="text-xs text-amber-600 mt-1">Student plans are restricted to Lunch only.</p>}
+          {isStudent && planMode === 'preset' && <p className="text-xs text-amber-600 mt-1">Student plans are restricted to Lunch only.</p>}
         </div>
 
         <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
@@ -401,13 +450,13 @@ export default function NewOrder() {
            
            <div ref={mapContainer} className="w-full h-48 bg-gray-100 rounded-md overflow-hidden border border-gray-300 relative" />
            
-           {isStudent && distance ? (
+           {isStudent && distance && planMode === 'preset' ? (
                <p className="text-sm font-bold text-green-700 mt-3 text-right">
                    Delivery Fee: Waived (Student Plan)
                </p>
            ) : deliveryFeePerMeal > 0 ? (
                <p className="text-sm font-bold text-indigo-700 mt-3 text-right">
-                   Delivery Fee: ₹{deliveryFeePerMeal.toFixed(2)} / meal
+                   Delivery Fee: Rs. {deliveryFeePerMeal.toFixed(2)} / meal
                </p>
            ) : null}
         </div>
@@ -430,9 +479,16 @@ export default function NewOrder() {
             <textarea placeholder="Dietary notes, gate code..." value={instructions} onChange={e => setInstructions(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" rows="2" />
         </div>
         
+        <div className="bg-green-50 border border-green-200 p-4 rounded-lg mt-6 mb-2 flex justify-between items-center">
+            <div>
+                <p className="text-sm font-bold text-gray-700">Total Amount to be Paid</p>
+                <p className="text-2xl font-black text-green-800">Rs. {totalAmount.toFixed(2)}</p>
+            </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3 border-t pt-4">
           <div>
-              <label className="block text-sm font-medium mb-1">Amount Received (₹)</label>
+              <label className="block text-sm font-medium mb-1">Amount Received (Rs.)</label>
               <input type="number" min="0" step="0.01" value={amountReceived} onChange={e => setAmountReceived(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" placeholder="0.00" />
           </div>
           <div>
@@ -443,12 +499,8 @@ export default function NewOrder() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t pt-4">
-          <div>
-              <p className="text-sm text-gray-500">Total Amount Due</p>
-              <p className="text-2xl font-bold text-green-700">₹{totalAmount.toFixed(2)}</p>
-          </div>
-          <button type="submit" disabled={submitting} className="bg-green-600 hover:bg-green-700 transition-colors text-white px-5 py-2.5 rounded-md font-medium disabled:opacity-50">
+        <div className="flex items-center justify-end border-t pt-4">
+          <button type="submit" disabled={submitting} className="bg-green-600 hover:bg-green-700 transition-colors text-white px-8 py-2.5 rounded-md font-bold disabled:opacity-50">
               {submitting ? 'Processing...' : 'Log Order'}
           </button>
         </div>

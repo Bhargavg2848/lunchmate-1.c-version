@@ -17,14 +17,11 @@ const drawPin = (doc, x, y) => {
   doc.circle(x, y - 2.5, 0.8, 'F');
 }
 
-// Logic for exact delivery calculation used in frontend
+// Rs. 8 Base + (Distance * 8) formula
 const calculateDeliveryFee = (d) => {
-  if (isNaN(d) || d <= 0) return 0;
-  const rounded = Math.round(d * 10) / 10;
-  if (rounded <= 1.0) return 5.0;
-  const extraKm = Math.floor(rounded) - 1.0;
-  const hundreds = Math.round((rounded - Math.floor(rounded)) * 10);
-  return 5.0 + (extraKm * 4.0) + (hundreds * 0.30);
+  const distance = Number(d);
+  if (isNaN(distance) || distance <= 0) return 0;
+  return 8.0 + (distance * 8.0);
 };
 
 export async function generateSubscriptionInvoice(subscription) {
@@ -32,12 +29,15 @@ export async function generateSubscriptionInvoice(subscription) {
     let distance = 0;
     let addonPrice = 0;
     let addonName = '';
+
+    // FIX: Properly capture the order ID from the overview page
+    const targetOrderId = subscription.order_id || subscription.subscription_order_id;
     
-    if (subscription.order_id) {
+    if (targetOrderId) {
         const { data: orderData } = await supabase
             .from('orders')
             .select('delivery_distance_km, snack_addon_offer_id')
-            .eq('order_id', subscription.order_id)
+            .eq('order_id', targetOrderId)
             .maybeSingle();
             
         if (orderData) {
@@ -58,65 +58,61 @@ export async function generateSubscriptionInvoice(subscription) {
 
     const doc = new jsPDF('p', 'mm', 'a4');
 
-    // TILED WATERMARK (Even smaller and lighter)
+    // CLEAN SINGLE WATERMARK
     const logo = await loadImage('/logo.jpeg');
     if (logo) {
-      doc.setGState(new doc.GState({ opacity: 0.03 }));
-      const w = 10; const h = 10;
-      for (let x = 5; x < 210; x += 30) {
-        for (let y = 45; y < 297; y += 30) {
-          doc.addImage(logo, 'JPEG', x, y, w, h);
-        }
-      }
+      doc.setGState(new doc.GState({ opacity: 0.08 })); // Light, elegant opacity
+      doc.addImage(logo, 'JPEG', 65, 90, 80, 80); // Perfectly centered
       doc.setGState(new doc.GState({ opacity: 1.0 }));
     }
 
-    // HEADER
-    doc.setFillColor(17, 24, 39); doc.rect(0, 0, 210, 40, 'F');
-    doc.setFontSize(26); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
-    doc.text('Lunchmate', 15, 20);
+    // HEADER - Modern Dark Mode Style
+    doc.setFillColor(17, 24, 39); doc.rect(0, 0, 210, 35, 'F');
+    doc.setFontSize(24); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
+    doc.text('Lunchmate', 15, 18);
     doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(200, 200, 200);
-    doc.text('Subscription Invoice & Delivery Receipt', 15, 28);
-    doc.text(`Order ID: ${subscription.order_id || 'N/A'}`, 195, 20, { align: 'right' });
-    doc.text(`Date: ${new Date(subscription.created_at || Date.now()).toLocaleDateString()}`, 195, 28, { align: 'right' });
+    doc.text('Subscription Invoice & Delivery Receipt', 15, 25);
+    doc.text(`Order ID: ${targetOrderId || 'N/A'}`, 195, 18, { align: 'right' });
+    doc.text(`Date: ${new Date(subscription.created_at || Date.now()).toLocaleDateString()}`, 195, 25, { align: 'right' });
 
     // ADDRESSES
     doc.setTextColor(50, 50, 50);
     doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-    doc.text('FROM:', 20, 55);
-    drawPin(doc, 22, 63);
+    doc.text('FROM:', 20, 50);
+    drawPin(doc, 22, 58);
     doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-    doc.text('Lunchmate Hub', 28, 62);
+    doc.text('Lunchmate Hub', 28, 57);
     doc.setFont('helvetica', 'normal');
-    doc.text(doc.splitTextToSize('Ramalayam street, Sriram nagar, Kondayya palem, Kakinada, Andhra Pradesh 533003', 75), 28, 67);
+    doc.text(doc.splitTextToSize('Ramalayam street, Sriram nagar, Kondayya palem, Kakinada, Andhra Pradesh 533003', 75), 28, 62);
 
     doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-    doc.text('BILLED & DELIVERED TO:', 110, 55);
-    drawPin(doc, 112, 63);
+    doc.text('BILLED & DELIVERED TO:', 110, 50);
+    drawPin(doc, 112, 58);
     doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-    doc.text(subscription.customer_name || 'N/A', 118, 62);
+    doc.text(subscription.customer_name || 'N/A', 118, 57);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Contact: ${subscription.customer_contact || 'N/A'}`, 118, 67);
-    doc.text(doc.splitTextToSize(subscription.customer_address || 'N/A', 80), 118, 72);
+    doc.text(`Contact: ${subscription.customer_contact || 'N/A'}`, 118, 62);
+    doc.text(doc.splitTextToSize(subscription.customer_address || 'N/A', 80), 118, 67);
 
-    // MATH
+    // MATH & CALCULATIONS
     const originalTotalAmount = Number(subscription.original_total_amount || 0);
     const revisedTotalAmount = Number(subscription.revised_total_amount || subscription.total_amount || originalTotalAmount);
     const amountPaid = Number(subscription.amount_received || 0);
     const balanceDue = Number(subscription.amount_due || 0);
     const credits = Number(subscription.plan_credits || 30);
     
-    const computedDeliveryFeePerMeal = calculateDeliveryFee(distance);
-    const computedTotalDeliveryCharge = computedDeliveryFeePerMeal * credits;
-    const deliveryFeePerMeal = Number(subscription.delivery_fee_per_delivery || computedDeliveryFeePerMeal);
-    const totalDeliveryCharge = Number(subscription.delivery_total_amount || computedTotalDeliveryCharge);
-    const subscriptionFoodAmount = Number(
-      subscription.food_total_amount ??
-      Math.max(0, revisedTotalAmount - totalDeliveryCharge - addonPrice)
-    );
-    const subtotalExcludingTax = subscriptionFoodAmount + totalDeliveryCharge + addonPrice;
-    const taxAmount = revisedTotalAmount - subtotalExcludingTax;
-    const grandTotal = subtotalExcludingTax + taxAmount;
+    // Calculate fee per meal based on DB distance
+    let deliveryFeePerMeal = calculateDeliveryFee(distance);
+    
+    // Fallback if distance is 0 but an old delivery fee was saved
+    if (distance === 0 && subscription.delivery_fee_per_delivery > 0) {
+        deliveryFeePerMeal = Number(subscription.delivery_fee_per_delivery);
+    }
+
+    const totalDeliveryCharge = deliveryFeePerMeal * credits;
+    const subscriptionFoodAmount = Math.max(0, originalTotalAmount - totalDeliveryCharge - addonPrice);
+    const taxAmount = Math.max(0, revisedTotalAmount - originalTotalAmount); 
+    const grandTotal = revisedTotalAmount;
 
     // TABLE
     const bodyRows = [
@@ -125,37 +121,47 @@ export async function generateSubscriptionInvoice(subscription) {
     if (addonPrice > 0) {
         bodyRows.push(["Snack Add-on", addonName, `Rs. ${addonPrice.toFixed(2)}`]);
     }
-    bodyRows.push(["Delivery Charges", `Rate: Rs. ${deliveryFeePerMeal.toFixed(2)} x ${credits}`, `Rs. ${totalDeliveryCharge.toFixed(2)}`]);
-    bodyRows.push(["GST / Tax", "Applied on subscription and delivery", `Rs. ${taxAmount.toFixed(2)}`]);
-    bodyRows.push(["Grand Total", "Inclusive of subscription, delivery and tax", `Rs. ${grandTotal.toFixed(2)}`]);
+    
+    // Clean delivery display
+    bodyRows.push(["Delivery Charges", `Rate: Rs. ${deliveryFeePerMeal.toFixed(2)} x ${credits} meals\nDistance: ${distance > 0 ? distance + ' km' : 'Calculated'}`, `Rs. ${totalDeliveryCharge.toFixed(2)}`]);
+    
+    if (taxAmount > 0) {
+        bodyRows.push(["Taxes / Adjustments", "Applied to final amount", `Rs. ${taxAmount.toFixed(2)}`]);
+    }
+    
+    bodyRows.push(["Grand Total", "Inclusive of all charges", `Rs. ${grandTotal.toFixed(2)}`]);
 
     autoTable(doc, {
-      startY: 97,
+      startY: 85,
       head: [["Item Description", "Details", "Amount (INR)"]],
       body: bodyRows,
       theme: 'grid',
-      headStyles: { fillColor: [17, 24, 39], textColor: [255, 255, 255] }, 
-      styles: { fontSize: 10, cellPadding: 6 },
+      headStyles: { fillColor: [31, 41, 55], textColor: [255, 255, 255], fontStyle: 'bold' }, 
+      styles: { fontSize: 10, cellPadding: 8, lineColor: [229, 231, 235], lineWidth: 0.1 },
       alternateRowStyles: { fillColor: [249, 250, 251] },
-      columnStyles: { 0: { cellWidth: 45, fontStyle: 'bold' }, 1: { cellWidth: 95 }, 2: { cellWidth: 40, halign: 'right', fontStyle: 'bold' } }
+      columnStyles: { 0: { cellWidth: 45, fontStyle: 'bold', textColor: [31, 41, 55] }, 1: { cellWidth: 95, textColor: [75, 85, 99] }, 2: { cellWidth: 40, halign: 'right', fontStyle: 'bold', textColor: [17, 24, 39] } }
     });
 
-    // TOTALS BOX
+    // TOTALS BOX - Clean styling with borders
     const finalY = doc.lastAutoTable.finalY + 15;
     doc.setFillColor(243, 244, 246); doc.rect(100, finalY - 8, 95, 45, 'F');
-    doc.setFontSize(11); doc.setTextColor(50, 50, 50);
+    doc.setDrawColor(209, 213, 219); doc.rect(100, finalY - 8, 95, 45, 'S'); 
+    doc.setFontSize(11); doc.setTextColor(55, 65, 81);
     doc.text('Original Total:', 105, finalY); doc.text(`Rs. ${originalTotalAmount.toFixed(2)}`, 185, finalY, { align: 'right' });
     doc.text('Revised Total:', 105, finalY + 8); doc.text(`Rs. ${revisedTotalAmount.toFixed(2)}`, 185, finalY + 8, { align: 'right' });
     doc.text('Amount Received:', 105, finalY + 16); doc.text(`Rs. ${amountPaid.toFixed(2)}`, 185, finalY + 16, { align: 'right' });
+    
+    doc.setDrawColor(209, 213, 219); doc.line(105, finalY + 20, 190, finalY + 20);
+    
     doc.setFontSize(12); doc.setFont('helvetica', 'bold');
     doc.setTextColor(balanceDue > 0 ? 220 : 22, balanceDue > 0 ? 38 : 163, balanceDue > 0 ? 38 : 74);
     doc.text('Balance Due:', 105, finalY + 28); doc.text(`Rs. ${balanceDue.toFixed(2)}`, 185, finalY + 28, { align: 'right' });
 
     // FOOTER
-    doc.setTextColor(150, 150, 150); doc.setFontSize(9); doc.setFont('helvetica', 'italic');
-    doc.text('Thank you for choosing Lunchmate! Home Made Food In Your door Steps.', 105, 285, { align: 'center' });
+    doc.setTextColor(156, 163, 175); doc.setFontSize(9); doc.setFont('helvetica', 'italic');
+    doc.text('Thank you for choosing Lunchmate! Home Made Food At Your Doorsteps.', 105, 285, { align: 'center' });
 
-    doc.save(`Invoice_${subscription.order_id}.pdf`);
+    doc.save(`Invoice_${targetOrderId}.pdf`);
     return { success: true };
   } catch (err) {
     console.error("PDF Error: ", err);

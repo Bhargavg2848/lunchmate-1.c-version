@@ -291,7 +291,6 @@ export default function SubscriptionDetails() {
     setSkipReason('')
   }
 
-  // --- THIS IS THE UPDATED FUNCTION ---
   function saveAmountReceived() {
     const hasAddAmount = addAmountReceived.trim().length > 0
     const addValue = Number(addAmountReceived)
@@ -316,7 +315,6 @@ export default function SubscriptionDetails() {
     execute(
       'payment',
       async () => {
-        // 1. Update the overall totals first
         const { error: rpcError } = await supabase.rpc('set_order_amount_received', {
           p_order_id: orderId,
           p_amount_received: newTotal,
@@ -325,7 +323,6 @@ export default function SubscriptionDetails() {
         
         if (rpcError) return { error: rpcError }
 
-        // 2. Insert a new record into the transaction history
         if (paidAmount !== 0) {
           const { error: txError } = await supabase.from('payment_transactions').insert([{
             order_id: orderId,
@@ -497,12 +494,16 @@ export default function SubscriptionDetails() {
                   <p className="font-bold">{money(overview.revised_total_amount)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Customer still owes</p>
-                  <p className="font-bold text-red-700">{money(overview.amount_due)}</p>
-                </div>
-                <div>
                   <p className="text-gray-500">Customer credit/refund</p>
                   <p className="font-bold text-blue-700">{money(overview.customer_credit)}</p>
+                </div>
+              </div>
+
+              {/* --- PROMINENT AMOUNT TO BE PAID (DUE) PLACED RIGHT BEFORE PAYMENT INPUTS --- */}
+              <div className="bg-red-50 border border-red-200 p-3 rounded-lg mt-4 flex justify-between items-center">
+                <div>
+                  <p className="text-xs font-bold text-red-600 uppercase">Amount to be Paid (Due)</p>
+                  <p className="text-xl font-black text-red-700">{money(overview.amount_due)}</p>
                 </div>
               </div>
 
