@@ -24,13 +24,11 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
   const [pin, setPin] = useState(null)
   const [geoLoading, setGeoLoading] = useState(false)
   const debounceRef = useRef(null)
-  
-  // Mapbox Refs
+
   const mapContainer = useRef(null)
   const map = useRef(null)
   const marker = useRef(null)
 
-  // Search Existing Customers in Supabase
   useEffect(() => {
     if (!query.trim() || selectedCustomer) {
       setResults([])
@@ -49,7 +47,6 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
     return () => clearTimeout(timer)
   }, [query, selectedCustomer])
 
-  // Mapbox Visual Map Rendering & Draggable Marker
   useEffect(() => {
     if (!pin || !showNewForm) {
       if (map.current) {
@@ -90,14 +87,19 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
     }
   }, [pin, showNewForm])
 
-  // --- HYBRID GEOCODING: Photon (Free OSM API) + Mapbox Geocoding ---
+  // --- HYBRID GEOCODING (HEAVILY LOCALIZED) ---
   async function fetchSuggestions(text) {
     setGeoLoading(true)
     const combinedSuggestions = []
 
-    // 1. Fetch from Photon (Free OpenStreetMap search by Komoot)
+    // 1. Define strict local bounding box (Andhra Pradesh Region)
+    const LOCAL_BBOX = "79.0,15.0,84.0,19.0"; 
+    
+    // 2. Force geographical context for fuzzy searchers
+    const photonText = text.toLowerCase().includes('andhra') ? text : `${text}, Andhra Pradesh, India`;
+
     try {
-      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(text)}&lat=${KITCHEN_COORDS[0]}&lon=${KITCHEN_COORDS[1]}&limit=4`
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(photonText)}&lat=${KITCHEN_COORDS[0]}&lon=${KITCHEN_COORDS[1]}&bbox=${LOCAL_BBOX}&limit=4`
       const photonRes = await fetch(photonUrl)
       const photonData = await photonRes.json()
       if (photonData?.features) {
@@ -117,10 +119,9 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
       console.error('Photon search failed:', err)
     }
 
-    // 2. Fetch from Mapbox Geocoding API (Kept intact)
     if (MAPBOX_TOKEN) {
       try {
-        const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${MAPBOX_TOKEN}&country=in&proximity=${KITCHEN_COORDS[1]},${KITCHEN_COORDS[0]}&types=address,poi,neighborhood,locality&limit=4`;
+        const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${MAPBOX_TOKEN}&country=in&bbox=${LOCAL_BBOX}&proximity=${KITCHEN_COORDS[1]},${KITCHEN_COORDS[0]}&types=address,poi,neighborhood,locality&limit=4`;
         const mapboxRes = await fetch(mapboxUrl)
         const mapboxData = await mapboxRes.json()
         if (mapboxData?.features) {
@@ -327,7 +328,7 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
               onChange={(e) => handleAddressChange(e.target.value)}
               className="w-full border rounded-md px-3 py-2 text-sm"
             />
-            {geoLoading && <p className="text-xs text-gray-400 mt-1">Searching Photon & Mapbox...</p>}
+            {geoLoading && <p className="text-xs text-gray-400 mt-1">Searching local areas...</p>}
             {addressSuggestions.length > 0 && (
               <div className="border rounded-md mt-1 max-h-48 overflow-y-auto bg-white shadow-md absolute z-10 w-full divide-y">
                 {addressSuggestions.map((item) => (
@@ -356,7 +357,7 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-2">
             <button
               type="button"
               disabled={creating}
