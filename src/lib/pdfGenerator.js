@@ -23,7 +23,6 @@ export async function generateSubscriptionInvoice(subscription) {
 
     const targetOrderId = subscription.order_id || subscription.subscription_order_id;
     
-    // Advanced Data Fetch: Check both subscription_orders and orders tables for distance
     if (targetOrderId) {
         let { data: orderData } = await supabase
             .from('subscription_orders')
@@ -106,9 +105,14 @@ export async function generateSubscriptionInvoice(subscription) {
     
     doc.setFont('helvetica', 'normal');
     
-    // STRICT WRAP FIX: Clean all weird spacing and enforce a strict 95mm maximum width boundary
-    const cleanAddress = (subscription.customer_address || 'Address N/A').replace(/\s+/g, ' ').trim();
-    doc.text(cleanAddress, 100, 58, { maxWidth: 95, align: 'left', lineHeightFactor: 1.5 });
+    // --- BULLETPROOF ADDRESS WRAPPING FIX ---
+    const rawAddress = subscription.customer_address || 'Address N/A';
+    // Clean out weird spaces and newlines
+    const safeAddress = rawAddress.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+    // Safely cut the string into an array of perfect 95mm lines
+    const addressLines = doc.splitTextToSize(safeAddress, 95);
+    // Draw the array
+    doc.text(addressLines, 100, 58);
 
     // --- 3. FINANCIAL MATH ---
     const originalTotalAmount = Number(subscription.original_total_amount || 0);
@@ -162,7 +166,8 @@ export async function generateSubscriptionInvoice(subscription) {
     }
 
     autoTable(doc, {
-        startY: 75,
+        // Dynamically push the table down if the address has multiple lines!
+        startY: Math.max(75, 58 + (addressLines.length * 5)), 
         head: [['ITEM', 'DESCRIPTION', 'TOTAL']],
         body: tableBody,
         theme: 'plain',
@@ -244,7 +249,7 @@ export async function generateSubscriptionInvoice(subscription) {
     doc.text('If you have any questions about this invoice, please contact us.', 15, pageHeight - 17);
     doc.text('This is a computer-generated document and does not require a signature.', 15, pageHeight - 12);
 
-    // --- OUTPUT HANDLER (Cloudinary) ---
+    // --- OUTPUT HANDLER (Cloudinary & Email) ---
     if (subscription.uploadToCloudinary) {
       const pdfBlob = doc.output('blob');
       
@@ -275,6 +280,3 @@ export async function generateSubscriptionInvoice(subscription) {
     return { error: err.message };
   }
 }
-
-
-
