@@ -9,15 +9,6 @@ const loadImage = (url) => new Promise((resolve) => {
   img.onerror = () => resolve(null);
 });
 
-const drawPin = (doc, x, y) => {
-  doc.setFillColor(220, 38, 38);
-  doc.circle(x, y - 2, 2, 'F');
-  doc.triangle(x - 2, y - 2, x + 2, y - 2, x, y + 2, 'F');
-  doc.setFillColor(255, 255, 255);
-  doc.circle(x, y - 2.5, 0.8, 'F');
-}
-
-// Rs. 8 Base + (Distance * 8) formula
 const calculateDeliveryFee = (d) => {
   const distance = Number(d);
   if (isNaN(distance) || distance <= 0) return 0;
@@ -30,15 +21,24 @@ export async function generateSubscriptionInvoice(subscription) {
     let addonPrice = 0;
     let addonName = '';
 
-    // FIX: Properly capture the order ID from the overview page
     const targetOrderId = subscription.order_id || subscription.subscription_order_id;
     
+    // Advanced Data Fetch: Check both subscription_orders and orders tables for distance
     if (targetOrderId) {
-        const { data: orderData } = await supabase
-            .from('orders')
+        let { data: orderData } = await supabase
+            .from('subscription_orders')
             .select('delivery_distance_km, snack_addon_offer_id')
             .eq('order_id', targetOrderId)
             .maybeSingle();
+            
+        if (!orderData) {
+            const { data: regularOrder } = await supabase
+                .from('orders')
+                .select('delivery_distance_km')
+                .eq('order_id', targetOrderId)
+                .maybeSingle();
+            if (regularOrder) orderData = regularOrder;
+        }
             
         if (orderData) {
             distance = Number(orderData.delivery_distance_km || 0);
@@ -57,114 +57,222 @@ export async function generateSubscriptionInvoice(subscription) {
     }
 
     const doc = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.width;
 
-    // CLEAN SINGLE WATERMARK
+    // --- 1. HEADER & LOGO ---
     const logo = await loadImage('/logo.jpeg');
     if (logo) {
-      doc.setGState(new doc.GState({ opacity: 0.08 })); // Light, elegant opacity
-      doc.addImage(logo, 'JPEG', 65, 90, 80, 80); // Perfectly centered
-      doc.setGState(new doc.GState({ opacity: 1.0 }));
+      doc.addImage(logo, 'JPEG', 15, 12, 25, 25);
     }
-
-    // HEADER - Modern Dark Mode Style
-    doc.setFillColor(17, 24, 39); doc.rect(0, 0, 210, 35, 'F');
-    doc.setFontSize(24); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
-    doc.text('Lunchmate', 15, 18);
-    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(200, 200, 200);
-    doc.text('Subscription Invoice & Delivery Receipt', 15, 25);
-    doc.text(`Order ID: ${targetOrderId || 'N/A'}`, 195, 18, { align: 'right' });
-    doc.text(`Date: ${new Date(subscription.created_at || Date.now()).toLocaleDateString()}`, 195, 25, { align: 'right' });
-
-    // ADDRESSES
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-    doc.text('FROM:', 20, 50);
-    drawPin(doc, 22, 58);
-    doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-    doc.text('Lunchmate Hub', 28, 57);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(31, 41, 55); 
+    doc.text('LUNCHMATE', 45, 22);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(doc.splitTextToSize('Ramalayam street, Sriram nagar, Kondayya palem, Kakinada, Andhra Pradesh 533003', 75), 28, 62);
+    doc.setTextColor(107, 114, 128); 
+    doc.text('Premium Home-Made Food Delivery', 45, 28);
+    doc.text('Kakinada, Andhra Pradesh 533003', 45, 33);
 
-    doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-    doc.text('BILLED & DELIVERED TO:', 110, 50);
-    drawPin(doc, 112, 58);
-    doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-    doc.text(subscription.customer_name || 'N/A', 118, 57);
+    // INVOICE META 
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(17, 24, 39);
+    doc.text('TAX INVOICE', pageWidth - 15, 22, { align: 'right' });
+    
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Contact: ${subscription.customer_contact || 'N/A'}`, 118, 62);
-    doc.text(doc.splitTextToSize(subscription.customer_address || 'N/A', 80), 118, 67);
+    doc.setTextColor(75, 85, 99);
+    doc.text(`Order ID: ${targetOrderId || 'N/A'}`, pageWidth - 15, 30, { align: 'right' });
+    doc.text(`Date: ${new Date(subscription.created_at || Date.now()).toLocaleDateString('en-IN', {day: '2-digit', month: 'short', year: 'numeric'})}`, pageWidth - 15, 35, { align: 'right' });
 
-    // MATH & CALCULATIONS
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.5);
+    doc.line(15, 42, pageWidth - 15, 42);
+
+    // --- 2. BILLING & DELIVERY DETAILS ---
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(31, 41, 55);
+    doc.text('BILLED TO:', 15, 52);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.text(subscription.customer_name || 'Customer Name N/A', 15, 58);
+    doc.text(`Phone: ${subscription.customer_contact || 'N/A'}`, 15, 63);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('DELIVERY ADDRESS:', 100, 52);
+    
+    doc.setFont('helvetica', 'normal');
+    
+    // STRICT WRAP FIX: Clean all weird spacing and enforce a strict 95mm maximum width boundary
+    const cleanAddress = (subscription.customer_address || 'Address N/A').replace(/\s+/g, ' ').trim();
+    doc.text(cleanAddress, 100, 58, { maxWidth: 95, align: 'left', lineHeightFactor: 1.5 });
+
+    // --- 3. FINANCIAL MATH ---
     const originalTotalAmount = Number(subscription.original_total_amount || 0);
     const revisedTotalAmount = Number(subscription.revised_total_amount || subscription.total_amount || originalTotalAmount);
     const amountPaid = Number(subscription.amount_received || 0);
     const balanceDue = Number(subscription.amount_due || 0);
-    const credits = Number(subscription.plan_credits || 30);
+    const credits = Number(subscription.plan_credits || 1);
     
-    // Calculate fee per meal based on DB distance
     let deliveryFeePerMeal = calculateDeliveryFee(distance);
-    
-    // Fallback if distance is 0 but an old delivery fee was saved
-    if (distance === 0 && subscription.delivery_fee_per_delivery > 0) {
-        deliveryFeePerMeal = Number(subscription.delivery_fee_per_delivery);
+    let totalDeliveryCharge = deliveryFeePerMeal * credits;
+
+    if (originalTotalAmount < totalDeliveryCharge) {
+        deliveryFeePerMeal = 0;
+        totalDeliveryCharge = 0;
     }
 
-    const totalDeliveryCharge = deliveryFeePerMeal * credits;
     const subscriptionFoodAmount = Math.max(0, originalTotalAmount - totalDeliveryCharge - addonPrice);
     const taxAmount = Math.max(0, revisedTotalAmount - originalTotalAmount); 
-    const grandTotal = revisedTotalAmount;
 
-    // TABLE
-    const bodyRows = [
-      ["Subscription Fee", `${subscription.plan_name || 'Plan'} (${credits} Meals)\n${subscription.original_menu_item_name || ''}`, `Rs. ${subscriptionFoodAmount.toFixed(2)}`]
-    ];
+    // --- 4. ITEMS TABLE ---
+    const tableBody = [];
+    
+    tableBody.push([
+        { content: 'Subscription Fee', styles: { fontStyle: 'bold' } },
+        `${subscription.plan_name || 'Plan'} (${credits} Meals)\nMenu: ${subscription.original_menu_item_name || 'Standard'}`,
+        `Rs. ${subscriptionFoodAmount.toFixed(2)}`
+    ]);
+
     if (addonPrice > 0) {
-        bodyRows.push(["Snack Add-on", addonName, `Rs. ${addonPrice.toFixed(2)}`]);
+        tableBody.push([
+            { content: 'Snack Add-on', styles: { fontStyle: 'bold' } },
+            addonName,
+            `Rs. ${addonPrice.toFixed(2)}`
+        ]);
     }
-    
-    // Clean delivery display
-    bodyRows.push(["Delivery Charges", `Rate: Rs. ${deliveryFeePerMeal.toFixed(2)} x ${credits} meals\nDistance: ${distance > 0 ? distance + ' km' : 'Calculated'}`, `Rs. ${totalDeliveryCharge.toFixed(2)}`]);
-    
+
+    tableBody.push([
+        { content: 'Delivery Charges', styles: { fontStyle: 'bold' } },
+        distance > 0 
+            ? `Distance: ${distance} km\nRate: Rs. ${deliveryFeePerMeal.toFixed(2)} / delivery x ${credits} deliveries`
+            : `Delivery Fee Waived / Included`,
+        `Rs. ${totalDeliveryCharge.toFixed(2)}`
+    ]);
+
     if (taxAmount > 0) {
-        bodyRows.push(["Taxes / Adjustments", "Applied to final amount", `Rs. ${taxAmount.toFixed(2)}`]);
+        tableBody.push([
+            { content: 'Taxes & Adjustments', styles: { fontStyle: 'bold' } },
+            'Applied to final revised amount',
+            `Rs. ${taxAmount.toFixed(2)}`
+        ]);
     }
-    
-    bodyRows.push(["Grand Total", "Inclusive of all charges", `Rs. ${grandTotal.toFixed(2)}`]);
 
     autoTable(doc, {
-      startY: 85,
-      head: [["Item Description", "Details", "Amount (INR)"]],
-      body: bodyRows,
-      theme: 'grid',
-      headStyles: { fillColor: [31, 41, 55], textColor: [255, 255, 255], fontStyle: 'bold' }, 
-      styles: { fontSize: 10, cellPadding: 8, lineColor: [229, 231, 235], lineWidth: 0.1 },
-      alternateRowStyles: { fillColor: [249, 250, 251] },
-      columnStyles: { 0: { cellWidth: 45, fontStyle: 'bold', textColor: [31, 41, 55] }, 1: { cellWidth: 95, textColor: [75, 85, 99] }, 2: { cellWidth: 40, halign: 'right', fontStyle: 'bold', textColor: [17, 24, 39] } }
+        startY: 75,
+        head: [['ITEM', 'DESCRIPTION', 'TOTAL']],
+        body: tableBody,
+        theme: 'plain',
+        headStyles: { 
+            fillColor: [243, 244, 246], 
+            textColor: [31, 41, 55], 
+            fontStyle: 'bold',
+            fontSize: 10,
+            cellPadding: 4
+        },
+        bodyStyles: {
+            textColor: [55, 65, 81],
+            fontSize: 10,
+            cellPadding: 5
+        },
+        columnStyles: { 
+            0: { cellWidth: 50 }, 
+            1: { cellWidth: 90 }, 
+            2: { cellWidth: 40, halign: 'right', fontStyle: 'bold', textColor: [17, 24, 39] } 
+        },
+        willDrawCell: function(data) {
+            if (data.row.section === 'body' && data.row.index !== tableBody.length - 1) {
+                doc.setDrawColor(243, 244, 246);
+                doc.setLineWidth(0.5);
+                doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+            }
+        }
     });
 
-    // TOTALS BOX - Clean styling with borders
+    // --- 5. SUMMARY TOTALS ---
     const finalY = doc.lastAutoTable.finalY + 15;
-    doc.setFillColor(243, 244, 246); doc.rect(100, finalY - 8, 95, 45, 'F');
-    doc.setDrawColor(209, 213, 219); doc.rect(100, finalY - 8, 95, 45, 'S'); 
-    doc.setFontSize(11); doc.setTextColor(55, 65, 81);
-    doc.text('Original Total:', 105, finalY); doc.text(`Rs. ${originalTotalAmount.toFixed(2)}`, 185, finalY, { align: 'right' });
-    doc.text('Revised Total:', 105, finalY + 8); doc.text(`Rs. ${revisedTotalAmount.toFixed(2)}`, 185, finalY + 8, { align: 'right' });
-    doc.text('Amount Received:', 105, finalY + 16); doc.text(`Rs. ${amountPaid.toFixed(2)}`, 185, finalY + 16, { align: 'right' });
     
-    doc.setDrawColor(209, 213, 219); doc.line(105, finalY + 20, 190, finalY + 20);
+    doc.setFillColor(249, 250, 251);
+    doc.roundedRect(pageWidth - 95, finalY - 8, 80, 50, 2, 2, 'F');
     
-    doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-    doc.setTextColor(balanceDue > 0 ? 220 : 22, balanceDue > 0 ? 38 : 163, balanceDue > 0 ? 38 : 74);
-    doc.text('Balance Due:', 105, finalY + 28); doc.text(`Rs. ${balanceDue.toFixed(2)}`, 185, finalY + 28, { align: 'right' });
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text('Subtotal:', pageWidth - 90, finalY); 
+    doc.text(`Rs. ${originalTotalAmount.toFixed(2)}`, pageWidth - 20, finalY, { align: 'right' });
+    
+    doc.text('Adjustments:', pageWidth - 90, finalY + 8); 
+    doc.text(`Rs. ${taxAmount.toFixed(2)}`, pageWidth - 20, finalY + 8, { align: 'right' });
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(31, 41, 55);
+    doc.text('Grand Total:', pageWidth - 90, finalY + 16); 
+    doc.text(`Rs. ${revisedTotalAmount.toFixed(2)}`, pageWidth - 20, finalY + 16, { align: 'right' });
 
-    // FOOTER
-    doc.setTextColor(156, 163, 175); doc.setFontSize(9); doc.setFont('helvetica', 'italic');
-    doc.text('Thank you for choosing Lunchmate! Home Made Food At Your Doorsteps.', 105, 285, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(75, 85, 99);
+    doc.text('Amount Paid:', pageWidth - 90, finalY + 24); 
+    doc.text(`Rs. ${amountPaid.toFixed(2)}`, pageWidth - 20, finalY + 24, { align: 'right' });
+    
+    doc.setDrawColor(209, 213, 219);
+    doc.line(pageWidth - 90, finalY + 28, pageWidth - 20, finalY + 28);
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    if (balanceDue > 0) {
+        doc.setTextColor(220, 38, 38); 
+    } else {
+        doc.setTextColor(22, 163, 74); 
+    }
+    doc.text('Balance Due:', pageWidth - 90, finalY + 35); 
+    doc.text(`Rs. ${balanceDue.toFixed(2)}`, pageWidth - 20, finalY + 35, { align: 'right' });
 
-    doc.save(`Invoice_${targetOrderId}.pdf`);
-    return { success: true };
+    // --- 6. FOOTER ---
+    const pageHeight = doc.internal.pageSize.height;
+    doc.setDrawColor(229, 231, 235);
+    doc.line(15, pageHeight - 30, pageWidth - 15, pageHeight - 30);
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(75, 85, 99);
+    doc.text('Thank you for choosing Lunchmate!', 15, pageHeight - 22);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(107, 114, 128);
+    doc.text('If you have any questions about this invoice, please contact us.', 15, pageHeight - 17);
+    doc.text('This is a computer-generated document and does not require a signature.', 15, pageHeight - 12);
+
+    // --- OUTPUT HANDLER (Cloudinary) ---
+    if (subscription.uploadToCloudinary) {
+      const pdfBase64 = doc.output('datauristring');
+      
+      const formData = new FormData();
+      formData.append('file', pdfBase64);
+      formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+      
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/auto/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await response.json();
+      if (data.error) throw new Error(data.error.message);
+      
+      return { success: true, url: data.secure_url };
+    } 
+    else if (subscription.returnBase64) {
+      const base64String = doc.output('datauristring').split(',')[1];
+      return { success: true, base64: base64String };
+    } 
+    else {
+      doc.save(`Invoice_${targetOrderId || 'Receipt'}.pdf`);
+      return { success: true };
+    }
   } catch (err) {
     console.error("PDF Error: ", err);
     return { error: err.message };
   }
 }
+

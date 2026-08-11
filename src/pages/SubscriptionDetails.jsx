@@ -67,7 +67,10 @@ export default function SubscriptionDetails() {
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  
   const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false)
 
   const [instructions, setInstructions] = useState('')
   const [futureDate, setFutureDate] = useState(todayDateString())
@@ -203,6 +206,72 @@ export default function SubscriptionDetails() {
     } finally {
       setGeneratingPdf(false)
     }
+  }
+
+  async function handleEmailInvoice() {
+    const email = window.prompt("Enter customer email address to send the invoice:")
+    if (!email) return;
+
+    setSendingEmail(true)
+    setError('')
+    setSuccess('')
+    try {
+      const result = await generateSubscriptionInvoice({ ...overview, returnBase64: true })
+      if (result?.error) throw new Error(result.error)
+
+      const res = await fetch('/api/send-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to_email: email,
+          customer_name: overview.customer_name || 'Customer',
+          order_id: overview.order_id || overview.subscription_order_id,
+          pdf_base64: result.base64
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error?.message || data.error || 'Failed to send email');
+      
+      setSuccess(`Invoice successfully sent to ${email}!`)
+    } catch (err) {
+      setError(`Email Error: ${err.message}`)
+    } finally {
+      setSendingEmail(false)
+    }
+  }
+
+    async function handleWhatsAppInvoice() {
+    if (!overview?.customer_contact) {
+      setError('No phone number on file for this customer.')
+      return
+    }
+
+    setSendingWhatsApp(true)
+    setError('')
+    setSuccess('')
+    try {
+      // 1. Generate and upload to isolated Cloudinary Storage
+      const result = await generateSubscriptionInvoice({ ...overview, uploadToCloudinary: true })
+      if (result?.error) throw new Error(result.error)
+
+      // 2. Format the phone number
+      let phone = overview.customer_contact.replace(/\D/g, '')
+      if (phone.length === 10) phone = `91${phone}`
+
+      // 3. Craft the WhatsApp message with the Cloudinary URL
+      const text = `Hi ${overview.customer_name},\n\nThank you for choosing Lunchmate! 🍱\n\nYour subscription is confirmed. You can view and download your detailed invoice receipt here:\n${result.url}\n\nHave a great day!`
+      
+      // 4. Open WhatsApp
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank')
+      
+      setSuccess('WhatsApp opened successfully!')
+    } catch (err) {
+      setError(`WhatsApp Error: ${err.message}`)
+    } finally {
+      setSendingWhatsApp(false)
+    }
+  }
   }
 
   function saveInstructions() {
@@ -371,14 +440,31 @@ export default function SubscriptionDetails() {
           <p className="text-sm text-gray-500">{overview.customer_address}</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleDownloadPDF}
-            disabled={generatingPdf}
+            disabled={generatingPdf || sendingWhatsApp || sendingEmail}
             className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white px-4 py-2 rounded-md font-medium shadow-sm transition-colors text-sm"
           >
-            {generatingPdf ? 'Generating...' : 'Download Invoice'}
+            {generatingPdf ? 'Downloading...' : 'Download Invoice'}
           </button>
+          
+          <button
+            onClick={handleEmailInvoice}
+            disabled={generatingPdf || sendingWhatsApp || sendingEmail}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-md font-medium shadow-sm transition-colors text-sm"
+          >
+            {sendingEmail ? 'Sending...' : 'Email Invoice'}
+          </button>
+
+          <button
+            onClick={handleWhatsAppInvoice}
+            disabled={generatingPdf || sendingWhatsApp || sendingEmail}
+            className="flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] disabled:opacity-50 text-white px-4 py-2 rounded-md font-bold shadow-sm transition-colors text-sm"
+          >
+            {sendingWhatsApp ? 'Generating...' : 'Send via WhatsApp'}
+          </button>
+          
           <button
             type="button"
             onClick={load}
@@ -499,7 +585,6 @@ export default function SubscriptionDetails() {
                 </div>
               </div>
 
-              {/* --- PROMINENT AMOUNT TO BE PAID (DUE) PLACED RIGHT BEFORE PAYMENT INPUTS --- */}
               <div className="bg-red-50 border border-red-200 p-3 rounded-lg mt-4 flex justify-between items-center">
                 <div>
                   <p className="text-xs font-bold text-red-600 uppercase">Amount to be Paid (Due)</p>
@@ -803,3 +888,4 @@ export default function SubscriptionDetails() {
     </div>
   )
 }
+

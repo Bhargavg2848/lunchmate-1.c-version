@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 
-// 1. Initialize Pure Mapbox (No Google needed!)
+// Initialize Mapbox
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 mapboxgl.accessToken = MAPBOX_TOKEN
 const COORD_PATTERN = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/
@@ -30,7 +30,7 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
   const map = useRef(null)
   const marker = useRef(null)
 
-  // Search Existing Customers
+  // Search Existing Customers in Supabase
   useEffect(() => {
     if (!query.trim() || selectedCustomer) {
       setResults([])
@@ -49,7 +49,7 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
     return () => clearTimeout(timer)
   }, [query, selectedCustomer])
 
-  // Mapbox Map Rendering
+  // Mapbox Visual Map Rendering & Draggable Marker
   useEffect(() => {
     if (!pin || !showNewForm) {
       if (map.current) {
@@ -90,32 +90,64 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
     }
   }, [pin, showNewForm])
 
-  // Mapbox Geocoding API (Address Search)
+  // --- HYBRID GEOCODING: Photon (Free OSM API) + Mapbox Geocoding ---
   async function fetchSuggestions(text) {
-    if (!MAPBOX_TOKEN) return;
     setGeoLoading(true)
+    const combinedSuggestions = []
+
+    // 1. Fetch from Photon (Free OpenStreetMap search by Komoot)
     try {
-      // Prioritize results near the kitchen in India
-      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${MAPBOX_TOKEN}&country=in&proximity=${KITCHEN_COORDS[1]},${KITCHEN_COORDS[0]}&types=address,poi,neighborhood,locality&limit=5`;
-      const res = await fetch(url)
-      const data = await res.json()
-      setAddressSuggestions(data.features || [])
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(text)}&lat=${KITCHEN_COORDS[0]}&lon=${KITCHEN_COORDS[1]}&limit=4`
+      const photonRes = await fetch(photonUrl)
+      const photonData = await photonRes.json()
+      if (photonData?.features) {
+        photonData.features.forEach((f, i) => {
+          const props = f.properties || {}
+          const labelParts = [props.name, props.street, props.district, props.city, props.state].filter(Boolean)
+          combinedSuggestions.push({
+            id: `photon-${i}-${f.geometry.coordinates.join(',')}`,
+            place_name: labelParts.join(', ') || props.name || 'Location Result',
+            lng: f.geometry.coordinates[0],
+            lat: f.geometry.coordinates[1],
+            source: 'Photon (OSM)'
+          })
+        })
+      }
     } catch (err) {
-      console.error('Mapbox search failed:', err)
+      console.error('Photon search failed:', err)
     }
+
+    // 2. Fetch from Mapbox Geocoding API (Kept intact)
+    if (MAPBOX_TOKEN) {
+      try {
+        const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${MAPBOX_TOKEN}&country=in&proximity=${KITCHEN_COORDS[1]},${KITCHEN_COORDS[0]}&types=address,poi,neighborhood,locality&limit=4`;
+        const mapboxRes = await fetch(mapboxUrl)
+        const mapboxData = await mapboxRes.json()
+        if (mapboxData?.features) {
+          mapboxData.features.forEach((f) => {
+            combinedSuggestions.push({
+              id: f.id,
+              place_name: f.place_name,
+              lng: f.center[0],
+              lat: f.center[1],
+              source: 'Mapbox'
+            })
+          })
+        }
+      } catch (err) {
+        console.error('Mapbox search failed:', err)
+      }
+    }
+
+    setAddressSuggestions(combinedSuggestions)
     setGeoLoading(false)
   }
 
-  function selectSuggestion(feature) {
-    const label = feature.place_name
-    // Mapbox returns coordinates as [longitude, latitude]
-    const lng = feature.center[0]
-    const lat = feature.center[1]
-    
-    setAddressQuery(label)
+  function selectSuggestion(item) {
+    setAddressQuery(item.place_name)
     setAddressSuggestions([])
-    setPin({ lat, lng })
-    setNewCustomer((prev) => ({ ...prev, address: label }))
+    setPin({ lat: item.lat, lng: item.lng })
+    setNewCustomer((prev) => ({ ...prev, address: item.place_name }))
   }
 
   function handleAddressChange(text) {
@@ -169,7 +201,6 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
           .single()
 
     const { data, error } = await request
-    
     setCreating(false)
 
     if (error) {
@@ -296,17 +327,20 @@ export default function CustomerPicker({ selectedCustomer, onSelect }) {
               onChange={(e) => handleAddressChange(e.target.value)}
               className="w-full border rounded-md px-3 py-2 text-sm"
             />
-            {geoLoading && <p className="text-xs text-gray-400 mt-1">Looking up...</p>}
+            {geoLoading && <p className="text-xs text-gray-400 mt-1">Searching Photon & Mapbox...</p>}
             {addressSuggestions.length > 0 && (
-              <div className="border rounded-md mt-1 max-h-48 overflow-y-auto bg-white shadow-sm absolute z-10 w-full">
-                {addressSuggestions.map((feature) => (
+              <div className="border rounded-md mt-1 max-h-48 overflow-y-auto bg-white shadow-md absolute z-10 w-full divide-y">
+                {addressSuggestions.map((item) => (
                   <button
                     type="button"
-                    key={feature.id}
-                    onClick={() => selectSuggestion(feature)}
-                    className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm border-b last:border-b-0"
+                    key={item.id}
+                    onClick={() => selectSuggestion(item)}
+                    className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm flex justify-between items-center"
                   >
-                    {feature.place_name}
+                    <span className="truncate pr-2">{item.place_name}</span>
+                    <span className="text-[10px] text-gray-400 border px-1 rounded shrink-0 bg-gray-50">
+                      {item.source}
+                    </span>
                   </button>
                 ))}
               </div>
