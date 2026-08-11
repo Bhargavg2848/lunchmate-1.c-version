@@ -246,10 +246,10 @@ export async function generateSubscriptionInvoice(subscription) {
 
     // --- OUTPUT HANDLER (Cloudinary) ---
     if (subscription.uploadToCloudinary) {
-      const pdfBase64 = doc.output('datauristring');
+      const pdfBlob = doc.output('blob');
       
       const formData = new FormData();
-      formData.append('file', pdfBase64);
+      formData.append('file', pdfBlob, 'invoice.pdf');
       formData.append('upload_preset', 'invoice');
       
       const response = await fetch(`https://api.cloudinary.com/v1_1/igdzn4bz/auto/upload`, {
@@ -275,5 +275,6 @@ export async function generateSubscriptionInvoice(subscription) {
     return { error: err.message };
   }
 }
+
 
 
