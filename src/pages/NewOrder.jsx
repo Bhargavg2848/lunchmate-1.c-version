@@ -17,13 +17,13 @@ const PAYMENT_MODES = [
   { value: 'other', label: 'Other' },
 ]
 
-const DELIVERY_RATES = { baseFee: 8.00, ratePerKm: 8.00 };
 const KITCHEN_COORDS = { lat: 16.968230, lng: 82.234376 };
 
+// FIXED: Synchronized with PDF logic (First km free, Rs. 8/km after)
 function calculateDeliveryFee(distanceKm) {
   const d = Number(distanceKm);
-  if (isNaN(d) || d <= 0) return 0;
-  return DELIVERY_RATES.baseFee + (d * DELIVERY_RATES.ratePerKm);
+  if (isNaN(d) || d <= 1.0) return 0;
+  return (d - 1.0) * 8.0;
 }
 
 export default function NewOrder() {
@@ -31,19 +31,19 @@ export default function NewOrder() {
   const [customer, setCustomer] = useState(null)
   const [orderType, setOrderType] = useState('subscription')
   const [orderSource, setOrderSource] = useState('HM')
-  const [planMode, setPlanMode] = useState('preset') // 'preset' | 'custom'
-  
+  const [planMode, setPlanMode] = useState('preset')
+
   // Data State
   const [groups, setGroups] = useState([])
   const [offers, setOffers] = useState([])
   const [menuItems, setMenuItems] = useState([])
-  
+
   // Subscription Selections
   const [groupId, setGroupId] = useState('')
   const [selectedMenuId, setSelectedMenuId] = useState('')
   const [offerId, setOfferId] = useState('')
   const [addonId, setAddonId] = useState('')
-  
+
   // Custom Plan Selections
   const [customDays, setCustomDays] = useState('')
   const [customMealPrice, setCustomMealPrice] = useState('')
@@ -52,7 +52,7 @@ export default function NewOrder() {
   const [oneTimeMenuId, setOneTimeMenuId] = useState('')
   const [oneTimeAmount, setOneTimeAmount] = useState('')
   const [specialReason, setSpecialReason] = useState('')
-  
+
   // Logistics & Payment
   const [mealSlot, setMealSlot] = useState('lunch')
   const [startDate, setStartDate] = useState(addDaysToDateString(todayDateString(), 1))
@@ -62,7 +62,7 @@ export default function NewOrder() {
   const [instructions, setInstructions] = useState('')
   const [amountReceived, setAmountReceived] = useState('')
   const [paymentMode, setPaymentMode] = useState('cash')
-  
+
   // UI State
   const [submitting, setSubmitting] = useState(false)
   const [verifying, setVerifying] = useState(false)
@@ -99,8 +99,8 @@ export default function NewOrder() {
         center: [KITCHEN_COORDS.lng, KITCHEN_COORDS.lat],
         zoom: 14
       });
-      
-      markerKitchen.current = new mapboxgl.Marker({ color: '#3b82f6' }) 
+
+      markerKitchen.current = new mapboxgl.Marker({ color: '#3b82f6' })
         .setLngLat([KITCHEN_COORDS.lng, KITCHEN_COORDS.lat])
         .addTo(map.current);
     }
@@ -120,36 +120,37 @@ export default function NewOrder() {
 
     if (customer?.latitude && customer?.longitude) {
       setCalculatingDistance(true)
-      
+
       const getDist = async () => {
-        const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${KITCHEN_COORDS.lng},${KITCHEN_COORDS.lat};${customer.longitude},${customer.latitude}?access_token=${MAPBOX_TOKEN}`
+        // FIXED: Using Public OSRM API for free, real-world driving distance routing
+        const url = `https://router.project-osrm.org/route/v1/driving/${KITCHEN_COORDS.lng},${KITCHEN_COORDS.lat};${customer.longitude},${customer.latitude}?overview=false`
         try {
           const res = await fetch(url)
           const data = await res.json()
           if (data.routes?.[0]) {
             setDistance((data.routes[0].distance / 1000).toFixed(1))
           }
-        } catch (e) { 
-          console.error("Mapbox distance fetch failed", e) 
+        } catch (e) {
+          console.error("OSRM distance fetch failed", e)
         }
         setCalculatingDistance(false)
       }
       getDist()
 
       if (!markerCustomer.current) {
-        markerCustomer.current = new mapboxgl.Marker({ color: '#ef4444' }) 
+        markerCustomer.current = new mapboxgl.Marker({ color: '#ef4444' })
           .setLngLat([customer.longitude, customer.latitude])
           .addTo(map.current)
       } else {
         markerCustomer.current.setLngLat([customer.longitude, customer.latitude])
       }
-      
+
       const bounds = new mapboxgl.LngLatBounds()
         .extend([KITCHEN_COORDS.lng, KITCHEN_COORDS.lat])
         .extend([customer.longitude, customer.latitude]);
-        
+
       map.current.fitBounds(bounds, { padding: 50 });
-      
+
     } else {
       setDistance('')
       if (markerCustomer.current) {
@@ -162,19 +163,19 @@ export default function NewOrder() {
 
   const activeGroup = groups.find(g => g.id === groupId)
   const isStudent = activeGroup?.code === 'student' || activeGroup?.name?.toLowerCase().includes('student')
-  
+
   const mainOffers = offers.filter(o => o.pricing_group_id === groupId && (o.offer_kind === 'main_meal' || o.offer_kind === 'standalone_snack'))
   const uniqueMenuItems = Array.from(new Set(mainOffers.map(o => o.menu_item_id))).map(id => ({ id, name: mainOffers.find(o => o.menu_item_id === id).menu_items.name }))
   const availablePlansForMenu = mainOffers.filter(o => o.menu_item_id === selectedMenuId)
   const activeOffer = offers.find(o => o.id === offerId)
   const availableAddons = offers.filter(o => o.pricing_group_id === groupId && o.offer_kind === 'snack_addon' && o.plan_id === activeOffer?.plan_id)
 
-  useEffect(() => { 
-    if (isStudent) setMealSlot('lunch') 
+  useEffect(() => {
+    if (isStudent) setMealSlot('lunch')
   }, [isStudent])
 
   let deliveryFeePerMeal = calculateDeliveryFee(distance)
-  if (isStudent && planMode === 'preset') deliveryFeePerMeal = 0; 
+  if (isStudent && planMode === 'preset') deliveryFeePerMeal = 0;
 
   let totalAmount = 0
   if (orderType === 'subscription') {
@@ -200,9 +201,9 @@ export default function NewOrder() {
         .from('customers')
         .update({ student_verification_status: 'verified' })
         .eq('id', customer.id);
-      
+
       if (updateError) throw updateError;
-      
+
       setCustomer({ ...customer, student_verification_status: 'verified' });
       setSuccess('Customer successfully marked as verified!');
       setTimeout(() => setSuccess(''), 3000);
@@ -218,7 +219,7 @@ export default function NewOrder() {
     setSubmitting(true)
     setError('')
     setSuccess('')
-    
+
     if (!customer || !customer.id) {
       setError('Please select a valid customer before submitting. (Customer ID is missing)')
       setSubmitting(false)
@@ -238,7 +239,7 @@ export default function NewOrder() {
           p_customer_id: customer.id,
           p_offer_id: planMode === 'preset' ? (offerId || null) : null,
           p_meal_slot: mealSlot || null,
-          p_start_date: startDate || null, 
+          p_start_date: startDate || null,
           p_delivery_distance_km: Number(distance || 0),
           p_amount_received: Number(amountReceived || 0),
           p_payment_mode: paymentMode || null,
@@ -254,7 +255,7 @@ export default function NewOrder() {
           p_customer_id: customer.id,
           p_menu_item_id: oneTimeMenuId || null,
           p_meal_slot: mealSlot || null,
-          p_delivery_date: startDate || null, 
+          p_delivery_date: startDate || null,
           p_delivery_distance_km: Number(distance || 0),
           p_food_amount: Number(oneTimeAmount || 0),
           p_amount_received: Number(amountReceived || 0),
@@ -265,14 +266,14 @@ export default function NewOrder() {
           p_original_total_amount: Number(totalAmount || 0)
         });
       }
-      
+
       if (res.error) throw res.error;
-      
-      setSuccess('Order logged successfully!'); 
+
+      setSuccess('Order logged successfully!');
       setCustomer(null); setOfferId(''); setDistance(''); setInstructions(''); setAmountReceived('');
       setCustomDays(''); setCustomMealPrice(''); setPlanMode('preset'); setSelectedMenuId('');
-    } catch (err) { 
-      setError(err.message) 
+    } catch (err) {
+      setError(err.message)
     }
     setSubmitting(false)
   }
@@ -282,12 +283,12 @@ export default function NewOrder() {
       <h1 className="text-xl font-bold mb-4">New Order</h1>
       <Alert type="error" message={error} onClose={() => setError('')} />
       <Alert type="success" message={success} onClose={() => setSuccess('')} />
-      
+
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="block text-sm font-medium mb-1">Customer</label>
           <CustomerPicker selectedCustomer={customer} onSelect={setCustomer} />
-          
+
           {customer && (
             <div className="mt-2 px-3 py-2 bg-gray-50 border rounded text-xs flex justify-between items-center">
               <span className="text-gray-600 font-medium">Verification Status:</span>
@@ -296,15 +297,15 @@ export default function NewOrder() {
               </span>
             </div>
           )}
-          
+
           {customer && isStudent && customer.student_verification_status !== 'verified' && planMode === 'preset' && (
              <div className="bg-red-50 border border-red-200 p-3 rounded-md mt-2 flex justify-between items-center">
                 <p className="text-xs text-red-700 font-bold">
                    Warning: You are selecting a Student Plan, but this customer is not verified!
                 </p>
-                <button 
-                   type="button" 
-                   onClick={handleVerifyStudent} 
+                <button
+                   type="button"
+                   onClick={handleVerifyStudent}
                    disabled={verifying}
                    className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded shadow-sm disabled:opacity-50 transition-colors shrink-0 ml-3"
                 >
@@ -360,7 +361,7 @@ export default function NewOrder() {
                     <option value="">Select Group...</option>
                     {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
-                
+
                 {groupId && (
                   <>
                     <label className="block text-sm font-medium mt-2">2. Menu Item</label>
@@ -370,7 +371,7 @@ export default function NewOrder() {
                     </select>
                   </>
                 )}
-                
+
                 {selectedMenuId && (
                   <>
                     <label className="block text-sm font-medium mt-2">3. Plan Duration & Price</label>
@@ -380,7 +381,7 @@ export default function NewOrder() {
                     </select>
                   </>
                 )}
-                
+
                 {activeOffer && availableAddons.length > 0 && (
                   <div className="border-t pt-3 mt-3">
                     <label className="block text-sm font-medium mb-1">4. Snack Add-on (Optional)</label>
@@ -400,7 +401,7 @@ export default function NewOrder() {
                       {menuItems.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Total Days</label>
@@ -421,7 +422,7 @@ export default function NewOrder() {
                 <option value="">Select Item...</option>
                 {menuItems.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
-            
+
             <label className="block text-sm font-medium mt-2">Approved Food Amount (Rs.)</label>
             <input type="number" placeholder="Amount" value={oneTimeAmount} onChange={e => setOneTimeAmount(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white" />
           </div>
@@ -443,13 +444,13 @@ export default function NewOrder() {
         <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
            <div className="flex justify-between items-end mb-2">
                <label className="block text-sm font-bold text-gray-800">Routing & Delivery Distance (km)</label>
-               {calculatingDistance && <span className="text-xs font-semibold text-blue-600 animate-pulse">Calculating Mapbox route...</span>}
+               {calculatingDistance && <span className="text-xs font-semibold text-blue-600 animate-pulse">Calculating OSRM route...</span>}
            </div>
-           
+
            <input type="number" step="0.1" value={distance} onChange={e => setDistance(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white shadow-inner mb-3" placeholder="e.g. 1.5" />
-           
+
            <div ref={mapContainer} className="w-full h-48 bg-gray-100 rounded-md overflow-hidden border border-gray-300 relative" />
-           
+
            {isStudent && distance && planMode === 'preset' ? (
                <p className="text-sm font-bold text-green-700 mt-3 text-right">
                    Delivery Fee: Waived (Student Plan)
@@ -473,12 +474,12 @@ export default function NewOrder() {
               Allow past date entry for backdated orders
             </label>
         </div>
-        
+
         <div>
             <label className="block text-sm font-medium mb-1">Instructions / Notes</label>
             <textarea placeholder="Dietary notes, gate code..." value={instructions} onChange={e => setInstructions(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm" rows="2" />
         </div>
-        
+
         <div className="bg-green-50 border border-green-200 p-4 rounded-lg mt-6 mb-2 flex justify-between items-center">
             <div>
                 <p className="text-sm font-bold text-gray-700">Total Amount to be Paid</p>
