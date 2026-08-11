@@ -241,7 +241,7 @@ export default function SubscriptionDetails() {
     }
   }
 
-    async function handleWhatsAppInvoice() {
+  async function handleWhatsAppInvoice() {
     if (!overview?.customer_contact) {
       setError('No phone number on file for this customer.')
       return
@@ -271,7 +271,6 @@ export default function SubscriptionDetails() {
     } finally {
       setSendingWhatsApp(false)
     }
-  }
   }
 
   function saveInstructions() {
@@ -888,4 +887,3 @@ export default function SubscriptionDetails() {
     </div>
   )
 }
-
