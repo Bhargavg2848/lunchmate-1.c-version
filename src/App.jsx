@@ -1,4 +1,5 @@
-﻿import DriverMode from './pages/DriverMode';
+﻿import DomainRouter from './components/DomainRouter';
+import DriverMode from './pages/DriverMode';
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
 import MenuManager from './pages/MenuManager.jsx'
 import NewOrder from './pages/NewOrder.jsx'
@@ -69,7 +70,8 @@ export default function App() {
         </nav>
 
         <main className="max-w-6xl mx-auto px-4 py-6">
-          <Routes>
+          <DomainRouter />
+        <Routes>
             <Route path="/" element={<NewOrder />} />
             <Route path="/deliveries" element={<Deliveries />} />
             <Route path="/kitchen" element={<KitchenDashboard />} />
@@ -91,3 +93,4 @@ export default function App() {
     </HashRouter>
   )
 }
+
