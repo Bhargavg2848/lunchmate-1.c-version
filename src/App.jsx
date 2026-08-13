@@ -19,7 +19,6 @@ function navClass(isActive) {
   }`
 }
 
-// 🔒 Admin Layout
 function AdminLayout({ children }) {
   return (
     <Auth>
@@ -46,34 +45,23 @@ function AdminLayout({ children }) {
   )
 }
 
-// 🔀 Smart Router for the root URL ("/")
-function SmartRoot() {
-  // If the customer visits the base URL, send them straight to the portal
-  if (window.location.hostname === 'customer.lunchmate.live') {
-    return <Navigate to="/portal" replace />;
-  }
-  // Otherwise, load the secure Admin New Order page
-  return (
-    <AdminLayout>
-      <NewOrder />
-    </AdminLayout>
-  );
-}
-
 export default function App() {
+  const isCustomerDomain = window.location.hostname === 'customer.lunchmate.live';
+
   return (
     <HashRouter>
       <Routes>
-        {/* 🟢 CUSTOMER PORTAL */}
-        <Route path="/portal/*" element={<CustomerPortalWrapper />} />
+        {/* If on customer domain, default straight to portal */}
+        {isCustomerDomain && <Route path="/" element={<Navigate to="/portal" replace />} />}
 
-        {/* 🔀 SMART ROOT ROUTE */}
-        <Route path="/" element={<SmartRoot />} />
+        {/* CUSTOMER PORTAL */}
+        <Route path="/portal" element={<CustomerPortalWrapper />} />
 
-        {/* 🔴 ADMIN OS */}
+        {/* ADMIN OS */}
         <Route path="/*" element={
           <AdminLayout>
             <Routes>
+              <Route path="/" element={<NewOrder />} />
               <Route path="/deliveries" element={<Deliveries />} />
               <Route path="/kitchen" element={<KitchenDashboard />} />
               <Route path="/roster" element={<DeliveryRoster />} />
