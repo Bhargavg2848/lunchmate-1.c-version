@@ -1,6 +1,17 @@
-﻿import { useState } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayDateString } from '../lib/date'
+import { ChefHat, CalendarDays, MessageSquare, LogOut, ShieldCheck, Sparkles } from 'lucide-react'
+
+// Premium Floating Motifs Background
+const FloatingMotifs = () => (
+  <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+    <div className="absolute top-[15%] left-[10%] text-4xl animate-bounce opacity-20 duration-[3000ms]">🍃</div>
+    <div className="absolute top-[35%] right-[15%] text-4xl animate-pulse opacity-20 duration-[4000ms]">🥕</div>
+    <div className="absolute bottom-[25%] left-[20%] text-4xl animate-bounce opacity-20 duration-[3500ms]">🥄</div>
+    <div className="absolute bottom-[10%] right-[10%] text-4xl animate-pulse opacity-20 duration-[5000ms]">🍲</div>
+  </div>
+)
 
 export default function CustomerPortal() {
   const [view, setView] = useState('login') 
@@ -15,8 +26,9 @@ export default function CustomerPortal() {
   const [customer, setCustomer] = useState(null)
   const [overview, setOverview] = useState(null)
   const [timeline, setTimeline] = useState([])
-  const [feedbackMsg, setFeedbackMsg] = useState('')
+  const [feedback, setFeedback] = useState('')
 
+  // --- SUPABASE BACKEND LOGIC ---
   async function handleLogin(e) {
     e.preventDefault()
     setLoading(true)
@@ -34,8 +46,8 @@ export default function CustomerPortal() {
         const { error: updateError } = await supabase.from('customers').update({ portal_pin: pin }).eq('id', custData.id)
         if (updateError) throw updateError
         custData.portal_pin = pin
-      } else {
-        if (custData.portal_pin !== pin) throw new Error('Incorrect PIN.')
+      } else if (custData.portal_pin !== pin) {
+        throw new Error('Incorrect Security PIN.')
       }
 
       setCustomer(custData)
@@ -87,7 +99,7 @@ export default function CustomerPortal() {
     }
   }
 
-  async function handleCustomerSkip(delivery) {
+  async function handleSkip(delivery) {
     const today = todayDateString()
     if (delivery.scheduled_date <= today) {
       alert("You cannot skip a meal scheduled for today. Preparation has already begun!")
@@ -110,19 +122,19 @@ export default function CustomerPortal() {
     }
   }
 
-  async function sendFeedback(e) {
+  async function handleFeedback(e) {
     e.preventDefault()
-    if (!feedbackMsg.trim()) return
+    if (!feedback.trim()) return
     setLoading(true)
     try {
       const { error } = await supabase.from('customer_feedback').insert([{
         customer_id: customer.id,
         customer_name: customer.name,
-        message: feedbackMsg
+        message: feedback
       }])
       if (error) throw error
-      setSuccess('Message sent to the kitchen!')
-      setFeedbackMsg('')
+      setSuccess('Message whispered to the chef! 🌿')
+      setFeedback('')
       setTimeout(() => setSuccess(''), 4000)
     } catch (err) {
       alert(err.message)
@@ -131,80 +143,90 @@ export default function CustomerPortal() {
     }
   }
 
-  // Animated Background Blobs for Premium Feel
-  const BackgroundEffects = () => (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-      <div className="absolute -top-[20%] -left-[10%] w-[70vw] h-[70vw] rounded-full bg-orange-300/20 blur-3xl animate-pulse mix-blend-multiply"></div>
-      <div className="absolute top-[20%] -right-[10%] w-[60vw] h-[60vw] rounded-full bg-rose-300/20 blur-3xl animate-pulse mix-blend-multiply delay-1000"></div>
-    </div>
-  )
+  // --- GLOBAL STYLES ---
+  const glassStyle = "bg-emerald-950/40 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)]"
+  const glossyBtn = "bg-gradient-to-br from-emerald-500/20 to-emerald-600/30 border border-emerald-400/30 backdrop-blur-md shadow-[0_4px_12px_rgba(16,185,129,0.2)]"
 
-  // --- VIEW 1: PREMIUM ANIMATED LOGIN ---
+  const bgWrapper = {
+    backgroundImage: "radial-gradient(1200px 600px at 10% -10%, rgba(16,185,129,0.20), transparent 60%), radial-gradient(900px 500px at 100% 10%, rgba(245,158,11,0.12), transparent 60%), radial-gradient(1000px 700px at 50% 120%, rgba(6,78,59,0.55), transparent 60%), linear-gradient(160deg, #022c22 0%, #041312 45%, #020617 100%)"
+  }
+
+  // --- VIEW 1: PREMIUM LOGIN ---
   if (view === 'login') {
     return (
-      <div className="fixed inset-0 z-[9999] bg-slate-50 flex items-center justify-center p-4 font-sans overflow-hidden">
-        <BackgroundEffects />
-        
-        <div className="relative z-10 w-full max-w-md transform transition-all duration-500 ease-out translate-y-0 opacity-100">
-          <div className="bg-white/70 backdrop-blur-2xl p-8 rounded-[2.5rem] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] border border-white">
-            
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-rose-500 text-white text-3xl mb-4 shadow-lg shadow-orange-500/30 transform transition hover:scale-110 hover:rotate-3 duration-300">
-                🍱
-              </div>
-              <h1 className="text-3xl font-black text-slate-800 tracking-tight">Lunchmate</h1>
-              <p className="text-slate-500 font-medium mt-1">Customer Portal</p>
+      <div className="fixed inset-0 z-[9999] w-full flex items-center justify-center p-5 font-sans overflow-hidden text-emerald-50" style={bgWrapper}>
+        <FloatingMotifs />
+        <div className="w-full max-w-md relative z-10">
+          
+          <div className="flex items-center justify-center gap-3 mb-8 select-none">
+            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center ${glossyBtn}`}>
+              <ChefHat className="h-7 w-7 text-emerald-50" strokeWidth={2.2} />
             </div>
-            
-            {error && (
-              <div className="bg-rose-50 border border-rose-100 text-rose-600 p-3.5 rounded-2xl text-sm mb-6 font-bold text-center animate-bounce">
-                {error}
-              </div>
-            )}
-            
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div className="group">
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1 transition-colors group-focus-within:text-orange-500">Phone Number</label>
-                <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-slate-100/50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-800 font-medium focus:bg-white focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all duration-300" placeholder="Enter your number" />
+            <div className="text-left">
+              <div className="text-3xl font-extrabold tracking-tight text-emerald-50">Lunchmate</div>
+              <div className="text-[11px] uppercase tracking-[0.22em] text-amber-300/80">Farm-fresh · Daily</div>
+            </div>
+          </div>
+
+          <div className={`${glassStyle} p-8 rounded-[2rem] relative`}>
+            <div className="mb-6">
+              <h1 className="text-3xl font-extrabold tracking-tight text-emerald-50 leading-tight">Welcome back.</h1>
+              <p className="text-sm text-emerald-100/70 mt-1.5">Sign in securely to manage today's meal, skip any day, and whisper notes to the chef.</p>
+            </div>
+
+            {error && <div className="bg-rose-500/20 border border-rose-500/30 text-rose-200 p-3 rounded-xl text-sm mb-5 font-bold text-center">{error}</div>}
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-emerald-300/70 uppercase tracking-wider mb-2 ml-1">Phone Number</label>
+                <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-2xl px-5 py-4 text-emerald-50 placeholder-emerald-100/30 focus:bg-black/40 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all" placeholder="Enter your number" />
               </div>
               
-              <div className="group">
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1 transition-colors group-focus-within:text-orange-500">Security PIN</label>
-                <input required type="password" maxLength="4" value={pin} onChange={e => setPin(e.target.value)} className="w-full bg-slate-100/50 border border-slate-200 rounded-2xl px-5 py-4 text-center tracking-[1.5em] font-black text-slate-800 focus:bg-white focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all duration-300" placeholder="••••" />
-                <p className="text-[11px] font-semibold text-slate-400 mt-2 text-center">First time? This PIN will be saved for future logins.</p>
+              <div>
+                <label className="block text-[11px] font-bold text-emerald-300/70 uppercase tracking-wider mb-2 ml-1">4-Digit Security PIN</label>
+                <input required type="password" maxLength="4" value={pin} onChange={e => setPin(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-2xl px-5 py-4 text-emerald-50 text-center tracking-[1.5em] font-black focus:bg-black/40 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all" placeholder="••••" />
               </div>
-              
-              <div className="pt-2">
-                <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white font-bold py-4 rounded-2xl shadow-[0_10px_20px_-10px_rgba(244,63,94,0.5)] hover:shadow-[0_15px_25px_-10px_rgba(244,63,94,0.6)] transform hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.97] active:translate-y-0 disabled:opacity-50">
-                  {loading ? 'Authenticating...' : 'Secure Login'}
-                </button>
-              </div>
+
+              <button type="submit" disabled={loading} className="w-full h-14 mt-4 rounded-2xl bg-white text-emerald-950 font-bold text-[15px] shadow-[0_10px_30px_rgba(255,255,255,0.15)] hover:shadow-[0_15px_40px_rgba(255,255,255,0.25)] active:scale-95 transition-all duration-300">
+                {loading ? 'Verifying...' : 'Secure Login'}
+              </button>
             </form>
+
+            <div className="grid grid-cols-2 gap-3 mt-8 pt-6 border-t border-white/10">
+              <div className="bg-white/5 rounded-xl py-3 text-center">
+                <ShieldCheck className="h-4 w-4 mx-auto text-emerald-300 mb-1" />
+                <div className="text-[10px] uppercase tracking-widest text-emerald-200/70">256-Bit Encrypted</div>
+              </div>
+              <div className="bg-white/5 rounded-xl py-3 text-center">
+                <Sparkles className="h-4 w-4 mx-auto text-amber-300 mb-1" />
+                <div className="text-[10px] uppercase tracking-widest text-emerald-200/70">Secure Session</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     )
   }
 
-  // --- VIEW 2: GOOGLE SYNC (Consistent Styling) ---
+  // --- VIEW 2: GOOGLE SYNC UI ---
   if (view === 'google-sync') {
     return (
-      <div className="fixed inset-0 z-[9999] bg-slate-50 flex items-center justify-center p-4 font-sans overflow-hidden">
-        <BackgroundEffects />
-        <div className="relative z-10 bg-white/70 backdrop-blur-2xl p-10 rounded-[2.5rem] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] border border-white w-full max-w-md text-center transform transition-all duration-500">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-[2rem] bg-gradient-to-br from-blue-400 to-indigo-500 text-white text-4xl mb-6 shadow-lg shadow-blue-500/30 transform transition hover:scale-110 duration-300">
-            ✉️
+      <div className="fixed inset-0 z-[9999] w-full flex items-center justify-center p-5 font-sans overflow-hidden text-emerald-50" style={bgWrapper}>
+        <FloatingMotifs />
+        <div className={`${glassStyle} w-full max-w-md p-10 rounded-[2rem] text-center relative z-10`}>
+          <div className={`inline-flex items-center justify-center w-20 h-20 rounded-[2rem] mb-6 ${glossyBtn}`}>
+             <span className="text-4xl">✉️</span>
           </div>
-          <h2 className="text-2xl font-black text-slate-800 mb-3">Link Your Email</h2>
-          <p className="text-slate-500 text-sm mb-8 font-medium leading-relaxed">Receive your digital invoices, live menu updates, and delivery alerts straight to your inbox.</p>
+          <h2 className="text-2xl font-black mb-3">Sync Your Email</h2>
+          <p className="text-emerald-100/70 text-sm mb-8 font-medium">Receive digital PDF invoices and live menu tracking links straight to your inbox.</p>
           
-          <input type="email" value={googleEmail} onChange={e => setGoogleEmail(e.target.value)} placeholder="name@gmail.com" className="w-full bg-slate-100/50 border border-slate-200 rounded-2xl px-5 py-4 mb-6 focus:bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-center font-medium transition-all duration-300" />
+          <input type="email" value={googleEmail} onChange={e => setGoogleEmail(e.target.value)} placeholder="yourname@gmail.com" className="w-full bg-black/20 border border-white/10 rounded-2xl px-5 py-4 mb-6 focus:ring-2 focus:ring-blue-500/50 outline-none text-center font-medium transition-all" />
           
-          <button onClick={() => handleGoogleSync(false)} disabled={!googleEmail || loading} className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold py-4 rounded-2xl shadow-[0_10px_20px_-10px_rgba(99,102,241,0.5)] transform hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.97] disabled:opacity-50 mb-4">
-            Connect Account
+          <button onClick={() => handleGoogleSync(false)} disabled={!googleEmail || loading} className="w-full bg-white text-emerald-950 font-black py-4 rounded-2xl active:scale-95 disabled:opacity-50 mb-4 transition-all">
+            Connect & Continue
           </button>
           
-          <button onClick={() => handleGoogleSync(true)} className="text-slate-400 hover:text-slate-600 font-bold text-sm transition-colors active:scale-95 inline-block">
+          <button onClick={() => handleGoogleSync(true)} className="text-emerald-400/70 hover:text-emerald-300 font-bold text-sm transition-colors">
             Skip for now
           </button>
         </div>
@@ -216,136 +238,108 @@ export default function CustomerPortal() {
   const pendingDeliveries = timeline.filter(d => d.status === 'pending')
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-slate-50 overflow-y-auto font-sans pb-16">
-      <BackgroundEffects />
+    <div className="fixed inset-0 z-[9999] overflow-y-auto font-sans text-emerald-50 pb-20" style={bgWrapper}>
+      <FloatingMotifs />
       
-      {/* Floating Glass Navbar */}
-      <div className="sticky top-0 z-50 px-4 pt-4 pb-2">
-        <div className="bg-white/80 backdrop-blur-xl px-5 py-4 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex justify-between items-center max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto p-4 space-y-6 pt-6 relative z-10">
+        
+        {/* Header */}
+        <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center text-white font-black text-lg shadow-md shadow-orange-500/20">
-              {customer?.name?.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <h1 className="text-lg font-black text-slate-800 leading-tight">Hi, {customer?.name.split(' ')[0]}</h1>
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{overview?.plan_name || 'No Active Plan'}</p>
-            </div>
+              <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${glossyBtn}`}>
+                <span className="font-black text-xl text-emerald-50">{customer?.name?.charAt(0).toUpperCase()}</span>
+              </div>
+              <div className="leading-tight">
+                <div className="text-[17px] font-bold text-emerald-50">
+                  Hi, {customer?.name?.split(" ")[0]} <span className="text-amber-300">👋</span>
+                </div>
+                <div className="text-[11px] uppercase tracking-[0.2em] text-emerald-300/70 mt-1">
+                  Lunchmate · Portal
+                </div>
+              </div>
           </div>
-          <button 
-            onClick={() => { setCustomer(null); setView('login') }} 
-            className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 active:scale-95"
-          >
-            Logout
+          <button onClick={() => { setCustomer(null); setView('login') }} className={`p-3 rounded-xl text-emerald-100 hover:text-white transition-colors ${glossyBtn} border-none`}>
+            <LogOut size={18} />
           </button>
         </div>
-      </div>
 
-      <div className="relative z-10 max-w-3xl mx-auto p-4 space-y-6 mt-2">
-        
-        {/* Dynamic Credit Card */}
+        {/* Credits Glass Card */}
         {overview && (
-          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-[2rem] p-8 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.3)] text-white relative overflow-hidden transform hover:-translate-y-1 transition-all duration-500">
-            <div className="absolute -top-10 -right-10 text-9xl opacity-5 transform rotate-12">🍲</div>
-            <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl"></div>
-            
-            <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.2em] mb-2">Available Credits</p>
-            <div className="flex items-baseline gap-2 mb-8">
-              <span className="text-7xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-300">{overview.credits_remaining}</span>
-              <span className="text-2xl text-slate-500 font-bold">/ {overview.plan_credits}</span>
+          <div className={`${glassStyle} p-7 rounded-[2rem] relative overflow-hidden`}>
+            <div className="absolute -top-10 -right-10 text-9xl opacity-5">🍲</div>
+            <p className="text-emerald-300/80 text-xs font-bold uppercase tracking-[0.2em] mb-2">Available Credits</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-6xl font-black text-white">{overview.credits_remaining}</span>
+              <span className="text-xl text-emerald-200/50 font-bold">/ {overview.plan_credits} meals</span>
             </div>
             
-            <div className="pt-6 border-t border-slate-700/50 flex justify-between items-center relative z-10">
-               <div>
-                  <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Total Plan</p>
-                  <p className="font-extrabold text-lg">₹{overview.revised_total_amount}</p>
-               </div>
-               <div className="text-right">
-                  <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Balance Due</p>
-                  <p className={`font-extrabold text-lg ${overview.amount_due > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                    ₹{overview.amount_due}
-                  </p>
-               </div>
+            <div className="mt-6 pt-5 border-t border-white/10 flex justify-between text-sm font-medium">
+              <span className="text-emerald-100/70">Total: ₹{overview.revised_total_amount}</span>
+              <span className="text-emerald-100/70">Balance: <span className={overview.amount_due > 0 ? "text-amber-300 font-bold" : "text-emerald-300 font-bold"}>₹{overview.amount_due}</span></span>
             </div>
           </div>
         )}
 
-        {/* Schedule List */}
-        <div>
-          <h2 className="text-xl font-black text-slate-800 mb-4 px-2">Upcoming Schedule</h2>
+        {/* Schedule */}
+        <div className="space-y-3">
+          <h3 className="text-emerald-100/60 text-xs font-bold uppercase tracking-wider flex items-center gap-2 mb-4 px-1">
+            <CalendarDays size={14} /> Upcoming Deliveries
+          </h3>
+          
           {pendingDeliveries.length === 0 ? (
-            <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2rem] border border-white text-center shadow-sm">
-              <p className="text-4xl mb-3">📅</p>
-              <p className="font-bold text-slate-600">Your schedule is empty.</p>
+            <div className={`${glassStyle} p-8 rounded-3xl text-center`}>
+              <p className="text-3xl mb-2">✨</p>
+              <p className="font-bold text-emerald-100/70">Your schedule is empty.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {pendingDeliveries.slice(0, 5).map(d => {
-                const isToday = d.scheduled_date === todayDateString()
-                const isPast = d.scheduled_date < todayDateString()
-                const canSkip = !isToday && !isPast
+            pendingDeliveries.slice(0, 5).map(d => {
+              const isToday = d.scheduled_date === todayDateString()
+              const isPast = d.scheduled_date < todayDateString()
+              const canSkip = !isToday && !isPast
 
-                return (
-                  <div key={d.id} className="bg-white/80 backdrop-blur-xl p-5 rounded-[1.5rem] border border-white shadow-[0_8px_20px_-10px_rgba(0,0,0,0.05)] flex justify-between items-center group hover:shadow-[0_15px_30px_-10px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 transition-all duration-300">
-                    <div>
-                      <p className={`font-black text-lg ${isToday ? 'text-orange-600' : 'text-slate-800'}`}>
-                        {d.scheduled_date} {isToday && <span className="text-xs font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full ml-2 align-middle">TODAY</span>}
-                      </p>
-                      <p className="text-sm font-semibold text-slate-500 mt-0.5">{d.meal_name_snapshot}</p>
-                    </div>
-                    <div>
-                      {canSkip ? (
-                        <button 
-                          onClick={() => handleCustomerSkip(d)}
-                          disabled={loading}
-                          className="bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 active:scale-95 shadow-sm"
-                        >
-                          Pause
-                        </button>
-                      ) : (
-                        <div className="bg-slate-50 border border-slate-100 text-slate-400 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                          {isToday ? <><span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span> Preparing</> : '🔒 Locked'}
-                        </div>
-                      )}
-                    </div>
+              return (
+                <div key={d.id} className="bg-emerald-950/30 backdrop-blur-md p-4 rounded-2xl flex justify-between items-center border border-white/5 hover:bg-emerald-950/50 transition-all">
+                  <div>
+                    <p className={`font-bold ${isToday ? 'text-amber-300' : 'text-emerald-50'}`}>
+                      {d.scheduled_date} {isToday && <span className="ml-2 text-[9px] bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-full uppercase tracking-wider">Today</span>}
+                    </p>
+                    <p className="text-xs text-emerald-300/60 mt-1 font-medium">{d.meal_name_snapshot}</p>
                   </div>
-                )
-              })}
-            </div>
+                  <div>
+                    {canSkip ? (
+                      <button onClick={() => handleSkip(d)} disabled={loading} className={`text-[11px] font-bold px-4 py-2 rounded-xl text-emerald-50 active:scale-95 transition-all ${glossyBtn}`}>
+                        Pause Day
+                      </button>
+                    ) : (
+                      <div className="text-[10px] uppercase tracking-widest text-emerald-100/40 bg-white/5 px-3 py-1.5 rounded-lg border border-white/5 flex items-center gap-1.5">
+                        {isToday ? <><span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span> Preparing</> : '🔒 Locked'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })
           )}
         </div>
 
-        {/* Feedback Card */}
-        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2rem] border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-2xl">💬</span>
-            <h2 className="text-xl font-black text-slate-800">Kitchen Inbox</h2>
-          </div>
-          <p className="text-sm font-semibold text-slate-500 mb-6">Need less spice tomorrow? Traveling soon? Drop a note to the chefs.</p>
-          
-          {success && (
-            <div className="bg-emerald-50 border border-emerald-100 text-emerald-600 p-4 rounded-2xl text-sm font-bold mb-6 text-center animate-pulse">
-              {success}
-            </div>
-          )}
-          
-          <form onSubmit={sendFeedback}>
-            <textarea 
-              required
-              value={feedbackMsg}
-              onChange={e => setFeedbackMsg(e.target.value)}
-              className="w-full bg-slate-100/50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-medium text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all duration-300 mb-4 resize-none" 
-              rows="3"
-              placeholder="Ex: Please add less spice for tomorrow's lunch..."
-            ></textarea>
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white py-4 rounded-2xl text-sm font-black tracking-wide shadow-[0_10px_20px_-10px_rgba(99,102,241,0.5)] hover:shadow-[0_15px_25px_-10px_rgba(99,102,241,0.6)] transform hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.97] disabled:opacity-50"
-            >
-              {loading ? 'Sending...' : 'Send Message'}
-            </button>
-          </form>
-        </div>
+        {/* Feedback Form */}
+        <form onSubmit={handleFeedback} className={`${glassStyle} p-7 rounded-[2rem]`}>
+          <h3 className="text-emerald-50 font-semibold flex items-center gap-2 mb-4">
+            <MessageSquare size={16} /> Whisper to Chef
+          </h3>
+          {success && <div className="bg-emerald-500/20 text-emerald-300 p-3 rounded-xl text-xs font-bold mb-4 text-center animate-pulse">{success}</div>}
+          <textarea
+            required
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            className="w-full bg-black/20 border border-white/10 rounded-2xl p-4 text-emerald-50 text-sm placeholder:text-emerald-300/40 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all mb-4 resize-none"
+            placeholder="Less spice, extra salad, traveling tomorrow..."
+            rows={3}
+          />
+          <button disabled={loading} className="w-full bg-white hover:bg-emerald-50 text-emerald-950 font-bold py-3.5 rounded-2xl transition-all active:scale-95 shadow-[0_10px_20px_rgba(255,255,255,0.1)]">
+            {loading ? "Whispering..." : "Send Message"}
+          </button>
+        </form>
 
       </div>
     </div>
