@@ -1,32 +1,27 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayDateString } from '../lib/date'
 
 export default function CustomerPortal() {
-  const [view, setView] = useState('login') // 'login', 'google-sync', 'dashboard'
+  const [view, setView] = useState('login') 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   
-  // Auth State
   const [phone, setPhone] = useState('')
   const [pin, setPin] = useState('')
   const [googleEmail, setGoogleEmail] = useState('')
   
-  // Data State
   const [customer, setCustomer] = useState(null)
   const [overview, setOverview] = useState(null)
   const [timeline, setTimeline] = useState([])
   const [feedbackMsg, setFeedbackMsg] = useState('')
 
-  // --- AUTH LOGIC ---
   async function handleLogin(e) {
     e.preventDefault()
     setLoading(true)
     setError('')
-    
     try {
-      // Find customer by phone
       const { data: custData, error: custError } = await supabase
         .from('customers')
         .select('*')
@@ -36,12 +31,10 @@ export default function CustomerPortal() {
       if (custError || !custData) throw new Error('Phone number not found in our system.')
 
       if (!custData.portal_pin) {
-        // First time login - set PIN
         const { error: updateError } = await supabase.from('customers').update({ portal_pin: pin }).eq('id', custData.id)
         if (updateError) throw updateError
         custData.portal_pin = pin
       } else {
-        // Existing user - verify PIN
         if (custData.portal_pin !== pin) throw new Error('Incorrect PIN code.')
       }
 
@@ -74,7 +67,6 @@ export default function CustomerPortal() {
     }
   }
 
-  // --- DASHBOARD LOGIC ---
   async function loadDashboardData(customerId) {
     const { data: subData } = await supabase
       .from('subscription_overview')
@@ -91,7 +83,6 @@ export default function CustomerPortal() {
         .select('*')
         .eq('subscription_order_id', subData.subscription_order_id)
         .order('scheduled_date', { ascending: true })
-      
       setTimeline(timeData || [])
     }
   }
@@ -102,8 +93,7 @@ export default function CustomerPortal() {
       alert("You cannot skip a meal scheduled for today. Preparation has already begun!")
       return
     }
-
-    if (!window.confirm(`Skip your meal on ${delivery.scheduled_date}? Your plan will be extended by one day.`)) return
+    if (!window.confirm(`Skip your meal on ${delivery.scheduled_date}? Your plan will extend by one day.`)) return
 
     setLoading(true)
     try {
@@ -141,165 +131,191 @@ export default function CustomerPortal() {
     }
   }
 
-  // --- RENDER VIEWS ---
+  // --- VIEW 1: PREMIUM GLASSMORPHISM LOGIN ---
   if (view === 'login') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center p-4 font-sans">
-        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50 w-full max-w-md">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Lunchmate</h1>
-            <p className="text-gray-500 font-medium mt-1">Customer Portal</p>
+      <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-149883716733f-56516d7083f0?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-orange-900/40 backdrop-blur-sm"></div>
+        
+        <div className="card w-full max-w-md glass shadow-2xl z-10 text-neutral-content">
+          <div className="card-body">
+            <h2 className="card-title text-3xl font-black text-white justify-center mb-1">Lunchmate</h2>
+            <p className="text-center text-orange-100 font-medium text-sm mb-6">Customer Portal</p>
+            
+            {error && <div className="alert alert-error shadow-lg py-2 rounded-xl mb-4"><span className="text-sm font-bold text-white">{error}</span></div>}
+            
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="form-control">
+                <label className="label"><span className="label-text text-orange-50 font-bold">Registered Phone Number</span></label>
+                <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="input input-bordered input-lg w-full bg-white/20 text-white placeholder-white/60 border-white/30 focus:border-white focus:ring-0 transition-all" placeholder="Enter phone number" />
+              </div>
+              
+              <div className="form-control">
+                <label className="label"><span className="label-text text-orange-50 font-bold">4-Digit Security PIN</span></label>
+                <input required type="password" maxLength="4" value={pin} onChange={e => setPin(e.target.value)} className="input input-bordered input-lg w-full bg-white/20 text-white placeholder-white/60 border-white/30 text-center tracking-[1em] font-black focus:border-white focus:ring-0 transition-all" placeholder="••••" />
+                <label className="label"><span className="label-text-alt text-orange-100/70 text-xs text-center w-full mt-2">First time logging in? Your PIN will be automatically saved.</span></label>
+              </div>
+              
+              <div className="form-control mt-4">
+                <button type="submit" disabled={loading} className="btn btn-primary border-none bg-orange-500 hover:bg-orange-600 text-white w-full rounded-xl shadow-lg">
+                  {loading ? <span className="loading loading-spinner"></span> : 'Secure Login'}
+                </button>
+              </div>
+            </form>
           </div>
-          {error && <p className="bg-red-50 text-red-600 p-3 rounded-xl text-sm mb-4 font-medium text-center">{error}</p>}
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1.5">Registered Phone Number</label>
-              <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-orange-500 outline-none transition-all" placeholder="Enter phone number" />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1.5">4-Digit Security PIN</label>
-              <input required type="password" maxLength="4" value={pin} onChange={e => setPin(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-center tracking-[1em] font-black focus:ring-2 focus:ring-orange-500 outline-none transition-all" placeholder="••••" />
-              <p className="text-xs text-gray-400 mt-2 text-center">If this is your first time, the PIN you enter will be saved as your new password.</p>
-            </div>
-            <button type="submit" disabled={loading} className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3.5 rounded-2xl shadow-[0_4px_14px_0_rgba(234,88,12,0.39)] transition-all active:scale-95 disabled:opacity-50">
-              {loading ? 'Authenticating...' : 'Secure Login'}
-            </button>
-          </form>
         </div>
       </div>
     )
   }
 
+  // --- VIEW 2: GOOGLE SYNC UI ---
   if (view === 'google-sync') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4 font-sans">
-        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50 w-full max-w-md text-center">
-          <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5 text-2xl">🔗</div>
-          <h2 className="text-2xl font-black text-gray-900 mb-2">Connect Your Account</h2>
-          <p className="text-gray-500 text-sm mb-6">Link your email to receive beautiful digital invoices and instant meal updates directly to your inbox.</p>
-          
-          <input type="email" value={googleEmail} onChange={e => setGoogleEmail(e.target.value)} placeholder="Enter your email address" className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 mb-4 focus:ring-2 focus:ring-blue-500 outline-none text-center" />
-          
-          <button onClick={() => handleGoogleSync(false)} disabled={!googleEmail || loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-2xl shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] transition-all active:scale-95 disabled:opacity-50 mb-4">
-            Connect & Continue
-          </button>
-          
-          <button onClick={() => handleGoogleSync(true)} className="text-gray-400 hover:text-gray-600 font-medium text-sm transition-colors">
-            Skip for now
-          </button>
+      <div className="min-h-screen bg-base-200 flex items-center justify-center p-4" data-theme="corporate">
+        <div className="card w-full max-w-md bg-base-100 shadow-xl">
+          <div className="card-body items-center text-center">
+            <div className="avatar placeholder mb-4">
+              <div className="bg-primary text-primary-content rounded-full w-16 shadow-md">
+                <span className="text-2xl">✉️</span>
+              </div>
+            </div>
+            <h2 className="card-title text-2xl font-black">Link Your Email</h2>
+            <p className="text-base-content/70 text-sm mb-6">Receive digital invoices, menu updates, and delivery alerts straight to your inbox.</p>
+            
+            <input type="email" value={googleEmail} onChange={e => setGoogleEmail(e.target.value)} placeholder="name@gmail.com" className="input input-bordered w-full mb-4 text-center" />
+            
+            <button onClick={() => handleGoogleSync(false)} disabled={!googleEmail || loading} className="btn btn-primary w-full shadow-md mb-3">
+              Connect Account
+            </button>
+            <button onClick={() => handleGoogleSync(true)} className="btn btn-ghost btn-sm text-base-content/50 hover:text-base-content">
+              Skip for now
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
+  // --- VIEW 3: PREMIUM DASHBOARD (CORPORATE THEME) ---
   const pendingDeliveries = timeline.filter(d => d.status === 'pending')
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans pb-12">
-      {/* Header */}
-      <div className="bg-white px-6 py-5 shadow-sm border-b border-gray-100 flex justify-between items-center sticky top-0 z-50">
-        <div>
-          <h1 className="text-xl font-black text-gray-900">Hi, {customer?.name.split(' ')[0]} 👋</h1>
-          <p className="text-sm text-gray-500 font-medium">{overview?.plan_name || 'No Active Plan'}</p>
+    <div className="min-h-screen bg-base-200 pb-12" data-theme="corporate">
+      {/* Navbar UI */}
+      <div className="navbar bg-base-100 shadow-sm sticky top-0 z-50">
+        <div className="flex-1">
+          <a className="btn btn-ghost normal-case text-xl font-black">Lunchmate</a>
         </div>
-        <button onClick={() => { setCustomer(null); setView('login') }} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
-          Log Out
-        </button>
+        <div className="flex-none">
+          <div className="dropdown dropdown-end">
+            <label tabIndex={0} className="btn btn-ghost btn-circle avatar placeholder">
+              <div className="bg-neutral text-neutral-content rounded-full w-10">
+                <span>{customer?.name?.charAt(0).toUpperCase()}</span>
+              </div>
+            </label>
+            <ul tabIndex={0} className="mt-3 z-[1] p-2 shadow menu menu-sm dropdown-content bg-base-100 rounded-box w-52">
+              <li><button onClick={() => { setCustomer(null); setView('login') }} className="text-error font-bold">Logout</button></li>
+            </ul>
+          </div>
+        </div>
       </div>
 
-      <div className="max-w-2xl mx-auto p-4 space-y-6 mt-4">
+      <div className="max-w-3xl mx-auto p-4 space-y-6 mt-4">
         
-        {/* Credit Card */}
+        {/* Welcome Section */}
+        <div>
+          <h2 className="text-2xl font-bold text-base-content">Hi, {customer?.name.split(' ')[0]} 👋</h2>
+          <p className="text-base-content/60 font-medium">{overview?.plan_name || 'No Active Plan'}</p>
+        </div>
+
+        {/* Third-Party Stats Component for Credits & Invoice */}
         {overview && (
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10 text-8xl font-black">🍲</div>
-            <p className="text-slate-400 font-medium text-sm uppercase tracking-widest mb-1">Available Credits</p>
-            <div className="flex items-end gap-2">
-              <span className="text-6xl font-black">{overview.credits_remaining}</span>
-              <span className="text-xl text-slate-400 font-bold mb-2">/ {overview.plan_credits}</span>
+          <div className="stats shadow w-full bg-base-100 border border-base-200">
+            <div className="stat">
+              <div className="stat-figure text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="inline-block w-8 h-8 stroke-current"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+              </div>
+              <div className="stat-title font-bold">Meals Remaining</div>
+              <div className="stat-value text-primary">{overview.credits_remaining} <span className="text-xl text-base-content/30">/ {overview.plan_credits}</span></div>
+              <div className="stat-desc font-medium mt-1 text-base-content/60">Enjoy your home-cooked food!</div>
             </div>
             
-            <div className="mt-6 pt-5 border-t border-slate-700/50 flex justify-between items-center">
-               <div>
-                  <p className="text-xs text-slate-400">Total Amount</p>
-                  <p className="font-bold">Rs. {overview.revised_total_amount}</p>
-               </div>
-               <div className="text-right">
-                  <p className="text-xs text-slate-400">Balance Due</p>
-                  <p className={`font-bold ${overview.amount_due > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                    Rs. {overview.amount_due}
-                  </p>
-               </div>
+            <div className="stat">
+              <div className="stat-figure text-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="inline-block w-8 h-8 stroke-current"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+              </div>
+              <div className="stat-title font-bold">Balance Due</div>
+              <div className={`stat-value ${overview.amount_due > 0 ? 'text-error' : 'text-success'}`}>₹{overview.amount_due}</div>
+              <div className="stat-desc font-medium mt-1 text-base-content/60">Total Cost: ₹{overview.revised_total_amount}</div>
             </div>
           </div>
         )}
 
-        {/* Up Next Schedule */}
-        <div>
-          <h2 className="text-lg font-bold text-gray-900 mb-3 px-1">Upcoming Deliveries</h2>
-          {pendingDeliveries.length === 0 ? (
-            <div className="bg-white p-6 rounded-3xl border border-gray-100 text-center text-gray-500 shadow-sm">
-              Your schedule is empty. 
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {pendingDeliveries.slice(0, 5).map(d => {
-                const isToday = d.scheduled_date === todayDateString()
-                const isPast = d.scheduled_date < todayDateString()
-                const canSkip = !isToday && !isPast
+        {/* Third-Party List Layout for Deliveries */}
+        <div className="card bg-base-100 shadow-xl border border-base-200">
+          <div className="card-body p-6">
+            <h2 className="card-title text-lg mb-2">Upcoming Schedule</h2>
+            
+            {pendingDeliveries.length === 0 ? (
+              <div className="alert shadow-sm bg-base-200/50 justify-center">Your schedule is empty.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="table">
+                  <tbody>
+                    {pendingDeliveries.slice(0, 5).map(d => {
+                      const isToday = d.scheduled_date === todayDateString()
+                      const isPast = d.scheduled_date < todayDateString()
+                      const canSkip = !isToday && !isPast
 
-                return (
-                  <div key={d.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] flex justify-between items-center group hover:border-gray-200 transition-colors">
-                    <div>
-                      <p className="font-bold text-gray-900">{d.scheduled_date}</p>
-                      <p className="text-sm text-gray-500">{d.meal_name_snapshot}</p>
-                    </div>
-                    <div>
-                      {canSkip ? (
-                        <button 
-                          onClick={() => handleCustomerSkip(d)}
-                          disabled={loading}
-                          className="bg-orange-50 hover:bg-orange-100 text-orange-700 px-4 py-2 rounded-xl text-sm font-bold transition-colors"
-                        >
-                          Pause/Skip
-                        </button>
-                      ) : (
-                        <span className="bg-gray-100 text-gray-500 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1">
-                          🔒 {isToday ? 'Preparing' : 'Locked'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                      return (
+                        <tr key={d.id} className="hover">
+                          <td>
+                            <div className="font-bold">{d.scheduled_date}</div>
+                            <div className="text-sm opacity-60">{d.meal_name_snapshot}</div>
+                          </td>
+                          <td className="text-right">
+                            {canSkip ? (
+                              <button onClick={() => handleCustomerSkip(d)} disabled={loading} className="btn btn-outline btn-warning btn-sm shadow-sm rounded-full px-4">
+                                Pause Day
+                              </button>
+                            ) : (
+                              <div className="badge badge-neutral badge-outline font-bold py-3 px-3 shadow-sm">
+                                {isToday ? 'Preparing 🍳' : 'Locked 🔒'}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Feedback Section */}
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]">
-          <h2 className="text-lg font-bold text-gray-900 mb-1">Message Kitchen</h2>
-          <p className="text-sm text-gray-500 mb-4">Need less spice tomorrow? Traveling soon? Let us know.</p>
-          
-          {success && <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-sm font-bold mb-4">{success}</div>}
-          
-          <form onSubmit={sendFeedback}>
-            <textarea 
-              required
-              value={feedbackMsg}
-              onChange={e => setFeedbackMsg(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all mb-3" 
-              rows="3"
-              placeholder="Type your instructions here..."
-            ></textarea>
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
-            >
-              Send Message
-            </button>
-          </form>
+        {/* Third-Party Feedback Form Layout */}
+        <div className="card bg-base-100 shadow-xl border border-base-200">
+          <div className="card-body p-6">
+            <h2 className="card-title text-lg mb-1">Kitchen Inbox</h2>
+            <p className="text-sm text-base-content/60 mb-4">Leave feedback, dietary notes, or delivery instructions.</p>
+            
+            {success && <div className="alert alert-success shadow-md py-2 mb-4 text-white font-bold"><span>{success}</span></div>}
+            
+            <form onSubmit={sendFeedback}>
+              <textarea 
+                required
+                value={feedbackMsg}
+                onChange={e => setFeedbackMsg(e.target.value)}
+                className="textarea textarea-bordered w-full mb-4 bg-base-200/50 focus:bg-base-100" 
+                rows="3"
+                placeholder="Ex: Please add less spice tomorrow..."
+              ></textarea>
+              <button type="submit" disabled={loading} className="btn btn-secondary w-full shadow-md">
+                {loading ? <span className="loading loading-dots"></span> : 'Send to Kitchen'}
+              </button>
+            </form>
+          </div>
         </div>
 
       </div>
