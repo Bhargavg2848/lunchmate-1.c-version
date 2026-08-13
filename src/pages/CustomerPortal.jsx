@@ -28,14 +28,14 @@ export default function CustomerPortal() {
         .ilike('contact', `%${phone.trim()}%`)
         .single()
         
-      if (custError || !custData) throw new Error('Phone number not found in our system.')
+      if (custError || !custData) throw new Error('Phone number not found.')
 
       if (!custData.portal_pin) {
         const { error: updateError } = await supabase.from('customers').update({ portal_pin: pin }).eq('id', custData.id)
         if (updateError) throw updateError
         custData.portal_pin = pin
       } else {
-        if (custData.portal_pin !== pin) throw new Error('Incorrect PIN code.')
+        if (custData.portal_pin !== pin) throw new Error('Incorrect PIN.')
       }
 
       setCustomer(custData)
@@ -121,7 +121,7 @@ export default function CustomerPortal() {
         message: feedbackMsg
       }])
       if (error) throw error
-      setSuccess('Message sent to the Lunchmate team!')
+      setSuccess('Message sent to the kitchen!')
       setFeedbackMsg('')
       setTimeout(() => setSuccess(''), 4000)
     } catch (err) {
@@ -131,34 +131,52 @@ export default function CustomerPortal() {
     }
   }
 
-  // --- VIEW 1: PREMIUM GLASSMORPHISM LOGIN ---
+  // Animated Background Blobs for Premium Feel
+  const BackgroundEffects = () => (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      <div className="absolute -top-[20%] -left-[10%] w-[70vw] h-[70vw] rounded-full bg-orange-300/20 blur-3xl animate-pulse mix-blend-multiply"></div>
+      <div className="absolute top-[20%] -right-[10%] w-[60vw] h-[60vw] rounded-full bg-rose-300/20 blur-3xl animate-pulse mix-blend-multiply delay-1000"></div>
+    </div>
+  )
+
+  // --- VIEW 1: PREMIUM ANIMATED LOGIN ---
   if (view === 'login') {
     return (
-      <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-149883716733f-56516d7083f0?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-orange-900/40 backdrop-blur-sm"></div>
+      <div className="fixed inset-0 z-[9999] bg-slate-50 flex items-center justify-center p-4 font-sans overflow-hidden">
+        <BackgroundEffects />
         
-        <div className="card w-full max-w-md glass shadow-2xl z-10 text-neutral-content">
-          <div className="card-body">
-            <h2 className="card-title text-3xl font-black text-white justify-center mb-1">Lunchmate</h2>
-            <p className="text-center text-orange-100 font-medium text-sm mb-6">Customer Portal</p>
+        <div className="relative z-10 w-full max-w-md transform transition-all duration-500 ease-out translate-y-0 opacity-100">
+          <div className="bg-white/70 backdrop-blur-2xl p-8 rounded-[2.5rem] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] border border-white">
             
-            {error && <div className="alert alert-error shadow-lg py-2 rounded-xl mb-4"><span className="text-sm font-bold text-white">{error}</span></div>}
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-rose-500 text-white text-3xl mb-4 shadow-lg shadow-orange-500/30 transform transition hover:scale-110 hover:rotate-3 duration-300">
+                🍱
+              </div>
+              <h1 className="text-3xl font-black text-slate-800 tracking-tight">Lunchmate</h1>
+              <p className="text-slate-500 font-medium mt-1">Customer Portal</p>
+            </div>
             
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="form-control">
-                <label className="label"><span className="label-text text-orange-50 font-bold">Registered Phone Number</span></label>
-                <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="input input-bordered input-lg w-full bg-white/20 text-white placeholder-white/60 border-white/30 focus:border-white focus:ring-0 transition-all" placeholder="Enter phone number" />
+            {error && (
+              <div className="bg-rose-50 border border-rose-100 text-rose-600 p-3.5 rounded-2xl text-sm mb-6 font-bold text-center animate-bounce">
+                {error}
+              </div>
+            )}
+            
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div className="group">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1 transition-colors group-focus-within:text-orange-500">Phone Number</label>
+                <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-slate-100/50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-800 font-medium focus:bg-white focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all duration-300" placeholder="Enter your number" />
               </div>
               
-              <div className="form-control">
-                <label className="label"><span className="label-text text-orange-50 font-bold">4-Digit Security PIN</span></label>
-                <input required type="password" maxLength="4" value={pin} onChange={e => setPin(e.target.value)} className="input input-bordered input-lg w-full bg-white/20 text-white placeholder-white/60 border-white/30 text-center tracking-[1em] font-black focus:border-white focus:ring-0 transition-all" placeholder="••••" />
-                <label className="label"><span className="label-text-alt text-orange-100/70 text-xs text-center w-full mt-2">First time logging in? Your PIN will be automatically saved.</span></label>
+              <div className="group">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1 transition-colors group-focus-within:text-orange-500">Security PIN</label>
+                <input required type="password" maxLength="4" value={pin} onChange={e => setPin(e.target.value)} className="w-full bg-slate-100/50 border border-slate-200 rounded-2xl px-5 py-4 text-center tracking-[1.5em] font-black text-slate-800 focus:bg-white focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all duration-300" placeholder="••••" />
+                <p className="text-[11px] font-semibold text-slate-400 mt-2 text-center">First time? This PIN will be saved for future logins.</p>
               </div>
               
-              <div className="form-control mt-4">
-                <button type="submit" disabled={loading} className="btn btn-primary border-none bg-orange-500 hover:bg-orange-600 text-white w-full rounded-xl shadow-lg">
-                  {loading ? <span className="loading loading-spinner"></span> : 'Secure Login'}
+              <div className="pt-2">
+                <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white font-bold py-4 rounded-2xl shadow-[0_10px_20px_-10px_rgba(244,63,94,0.5)] hover:shadow-[0_15px_25px_-10px_rgba(244,63,94,0.6)] transform hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.97] active:translate-y-0 disabled:opacity-50">
+                  {loading ? 'Authenticating...' : 'Secure Login'}
                 </button>
               </div>
             </form>
@@ -168,154 +186,165 @@ export default function CustomerPortal() {
     )
   }
 
-  // --- VIEW 2: GOOGLE SYNC UI ---
+  // --- VIEW 2: GOOGLE SYNC (Consistent Styling) ---
   if (view === 'google-sync') {
     return (
-      <div className="min-h-screen bg-base-200 flex items-center justify-center p-4" data-theme="corporate">
-        <div className="card w-full max-w-md bg-base-100 shadow-xl">
-          <div className="card-body items-center text-center">
-            <div className="avatar placeholder mb-4">
-              <div className="bg-primary text-primary-content rounded-full w-16 shadow-md">
-                <span className="text-2xl">✉️</span>
-              </div>
-            </div>
-            <h2 className="card-title text-2xl font-black">Link Your Email</h2>
-            <p className="text-base-content/70 text-sm mb-6">Receive digital invoices, menu updates, and delivery alerts straight to your inbox.</p>
-            
-            <input type="email" value={googleEmail} onChange={e => setGoogleEmail(e.target.value)} placeholder="name@gmail.com" className="input input-bordered w-full mb-4 text-center" />
-            
-            <button onClick={() => handleGoogleSync(false)} disabled={!googleEmail || loading} className="btn btn-primary w-full shadow-md mb-3">
-              Connect Account
-            </button>
-            <button onClick={() => handleGoogleSync(true)} className="btn btn-ghost btn-sm text-base-content/50 hover:text-base-content">
-              Skip for now
-            </button>
+      <div className="fixed inset-0 z-[9999] bg-slate-50 flex items-center justify-center p-4 font-sans overflow-hidden">
+        <BackgroundEffects />
+        <div className="relative z-10 bg-white/70 backdrop-blur-2xl p-10 rounded-[2.5rem] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] border border-white w-full max-w-md text-center transform transition-all duration-500">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-[2rem] bg-gradient-to-br from-blue-400 to-indigo-500 text-white text-4xl mb-6 shadow-lg shadow-blue-500/30 transform transition hover:scale-110 duration-300">
+            ✉️
           </div>
+          <h2 className="text-2xl font-black text-slate-800 mb-3">Link Your Email</h2>
+          <p className="text-slate-500 text-sm mb-8 font-medium leading-relaxed">Receive your digital invoices, live menu updates, and delivery alerts straight to your inbox.</p>
+          
+          <input type="email" value={googleEmail} onChange={e => setGoogleEmail(e.target.value)} placeholder="name@gmail.com" className="w-full bg-slate-100/50 border border-slate-200 rounded-2xl px-5 py-4 mb-6 focus:bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-center font-medium transition-all duration-300" />
+          
+          <button onClick={() => handleGoogleSync(false)} disabled={!googleEmail || loading} className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold py-4 rounded-2xl shadow-[0_10px_20px_-10px_rgba(99,102,241,0.5)] transform hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.97] disabled:opacity-50 mb-4">
+            Connect Account
+          </button>
+          
+          <button onClick={() => handleGoogleSync(true)} className="text-slate-400 hover:text-slate-600 font-bold text-sm transition-colors active:scale-95 inline-block">
+            Skip for now
+          </button>
         </div>
       </div>
     )
   }
 
-  // --- VIEW 3: PREMIUM DASHBOARD (CORPORATE THEME) ---
+  // --- VIEW 3: PREMIUM DASHBOARD ---
   const pendingDeliveries = timeline.filter(d => d.status === 'pending')
 
   return (
-    <div className="min-h-screen bg-base-200 pb-12" data-theme="corporate">
-      {/* Navbar UI */}
-      <div className="navbar bg-base-100 shadow-sm sticky top-0 z-50">
-        <div className="flex-1">
-          <a className="btn btn-ghost normal-case text-xl font-black">Lunchmate</a>
-        </div>
-        <div className="flex-none">
-          <div className="dropdown dropdown-end">
-            <label tabIndex={0} className="btn btn-ghost btn-circle avatar placeholder">
-              <div className="bg-neutral text-neutral-content rounded-full w-10">
-                <span>{customer?.name?.charAt(0).toUpperCase()}</span>
-              </div>
-            </label>
-            <ul tabIndex={0} className="mt-3 z-[1] p-2 shadow menu menu-sm dropdown-content bg-base-100 rounded-box w-52">
-              <li><button onClick={() => { setCustomer(null); setView('login') }} className="text-error font-bold">Logout</button></li>
-            </ul>
+    <div className="fixed inset-0 z-[9999] bg-slate-50 overflow-y-auto font-sans pb-16">
+      <BackgroundEffects />
+      
+      {/* Floating Glass Navbar */}
+      <div className="sticky top-0 z-50 px-4 pt-4 pb-2">
+        <div className="bg-white/80 backdrop-blur-xl px-5 py-4 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex justify-between items-center max-w-3xl mx-auto">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center text-white font-black text-lg shadow-md shadow-orange-500/20">
+              {customer?.name?.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <h1 className="text-lg font-black text-slate-800 leading-tight">Hi, {customer?.name.split(' ')[0]}</h1>
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{overview?.plan_name || 'No Active Plan'}</p>
+            </div>
           </div>
+          <button 
+            onClick={() => { setCustomer(null); setView('login') }} 
+            className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 active:scale-95"
+          >
+            Logout
+          </button>
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto p-4 space-y-6 mt-4">
+      <div className="relative z-10 max-w-3xl mx-auto p-4 space-y-6 mt-2">
         
-        {/* Welcome Section */}
-        <div>
-          <h2 className="text-2xl font-bold text-base-content">Hi, {customer?.name.split(' ')[0]} 👋</h2>
-          <p className="text-base-content/60 font-medium">{overview?.plan_name || 'No Active Plan'}</p>
-        </div>
-
-        {/* Third-Party Stats Component for Credits & Invoice */}
+        {/* Dynamic Credit Card */}
         {overview && (
-          <div className="stats shadow w-full bg-base-100 border border-base-200">
-            <div className="stat">
-              <div className="stat-figure text-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="inline-block w-8 h-8 stroke-current"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              </div>
-              <div className="stat-title font-bold">Meals Remaining</div>
-              <div className="stat-value text-primary">{overview.credits_remaining} <span className="text-xl text-base-content/30">/ {overview.plan_credits}</span></div>
-              <div className="stat-desc font-medium mt-1 text-base-content/60">Enjoy your home-cooked food!</div>
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-[2rem] p-8 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.3)] text-white relative overflow-hidden transform hover:-translate-y-1 transition-all duration-500">
+            <div className="absolute -top-10 -right-10 text-9xl opacity-5 transform rotate-12">🍲</div>
+            <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl"></div>
+            
+            <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.2em] mb-2">Available Credits</p>
+            <div className="flex items-baseline gap-2 mb-8">
+              <span className="text-7xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-300">{overview.credits_remaining}</span>
+              <span className="text-2xl text-slate-500 font-bold">/ {overview.plan_credits}</span>
             </div>
             
-            <div className="stat">
-              <div className="stat-figure text-secondary">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="inline-block w-8 h-8 stroke-current"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
-              </div>
-              <div className="stat-title font-bold">Balance Due</div>
-              <div className={`stat-value ${overview.amount_due > 0 ? 'text-error' : 'text-success'}`}>₹{overview.amount_due}</div>
-              <div className="stat-desc font-medium mt-1 text-base-content/60">Total Cost: ₹{overview.revised_total_amount}</div>
+            <div className="pt-6 border-t border-slate-700/50 flex justify-between items-center relative z-10">
+               <div>
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Total Plan</p>
+                  <p className="font-extrabold text-lg">₹{overview.revised_total_amount}</p>
+               </div>
+               <div className="text-right">
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Balance Due</p>
+                  <p className={`font-extrabold text-lg ${overview.amount_due > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    ₹{overview.amount_due}
+                  </p>
+               </div>
             </div>
           </div>
         )}
 
-        {/* Third-Party List Layout for Deliveries */}
-        <div className="card bg-base-100 shadow-xl border border-base-200">
-          <div className="card-body p-6">
-            <h2 className="card-title text-lg mb-2">Upcoming Schedule</h2>
-            
-            {pendingDeliveries.length === 0 ? (
-              <div className="alert shadow-sm bg-base-200/50 justify-center">Your schedule is empty.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="table">
-                  <tbody>
-                    {pendingDeliveries.slice(0, 5).map(d => {
-                      const isToday = d.scheduled_date === todayDateString()
-                      const isPast = d.scheduled_date < todayDateString()
-                      const canSkip = !isToday && !isPast
+        {/* Schedule List */}
+        <div>
+          <h2 className="text-xl font-black text-slate-800 mb-4 px-2">Upcoming Schedule</h2>
+          {pendingDeliveries.length === 0 ? (
+            <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2rem] border border-white text-center shadow-sm">
+              <p className="text-4xl mb-3">📅</p>
+              <p className="font-bold text-slate-600">Your schedule is empty.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingDeliveries.slice(0, 5).map(d => {
+                const isToday = d.scheduled_date === todayDateString()
+                const isPast = d.scheduled_date < todayDateString()
+                const canSkip = !isToday && !isPast
 
-                      return (
-                        <tr key={d.id} className="hover">
-                          <td>
-                            <div className="font-bold">{d.scheduled_date}</div>
-                            <div className="text-sm opacity-60">{d.meal_name_snapshot}</div>
-                          </td>
-                          <td className="text-right">
-                            {canSkip ? (
-                              <button onClick={() => handleCustomerSkip(d)} disabled={loading} className="btn btn-outline btn-warning btn-sm shadow-sm rounded-full px-4">
-                                Pause Day
-                              </button>
-                            ) : (
-                              <div className="badge badge-neutral badge-outline font-bold py-3 px-3 shadow-sm">
-                                {isToday ? 'Preparing 🍳' : 'Locked 🔒'}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                return (
+                  <div key={d.id} className="bg-white/80 backdrop-blur-xl p-5 rounded-[1.5rem] border border-white shadow-[0_8px_20px_-10px_rgba(0,0,0,0.05)] flex justify-between items-center group hover:shadow-[0_15px_30px_-10px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 transition-all duration-300">
+                    <div>
+                      <p className={`font-black text-lg ${isToday ? 'text-orange-600' : 'text-slate-800'}`}>
+                        {d.scheduled_date} {isToday && <span className="text-xs font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full ml-2 align-middle">TODAY</span>}
+                      </p>
+                      <p className="text-sm font-semibold text-slate-500 mt-0.5">{d.meal_name_snapshot}</p>
+                    </div>
+                    <div>
+                      {canSkip ? (
+                        <button 
+                          onClick={() => handleCustomerSkip(d)}
+                          disabled={loading}
+                          className="bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 active:scale-95 shadow-sm"
+                        >
+                          Pause
+                        </button>
+                      ) : (
+                        <div className="bg-slate-50 border border-slate-100 text-slate-400 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                          {isToday ? <><span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span> Preparing</> : '🔒 Locked'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Third-Party Feedback Form Layout */}
-        <div className="card bg-base-100 shadow-xl border border-base-200">
-          <div className="card-body p-6">
-            <h2 className="card-title text-lg mb-1">Kitchen Inbox</h2>
-            <p className="text-sm text-base-content/60 mb-4">Leave feedback, dietary notes, or delivery instructions.</p>
-            
-            {success && <div className="alert alert-success shadow-md py-2 mb-4 text-white font-bold"><span>{success}</span></div>}
-            
-            <form onSubmit={sendFeedback}>
-              <textarea 
-                required
-                value={feedbackMsg}
-                onChange={e => setFeedbackMsg(e.target.value)}
-                className="textarea textarea-bordered w-full mb-4 bg-base-200/50 focus:bg-base-100" 
-                rows="3"
-                placeholder="Ex: Please add less spice tomorrow..."
-              ></textarea>
-              <button type="submit" disabled={loading} className="btn btn-secondary w-full shadow-md">
-                {loading ? <span className="loading loading-dots"></span> : 'Send to Kitchen'}
-              </button>
-            </form>
+        {/* Feedback Card */}
+        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2rem] border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-2xl">💬</span>
+            <h2 className="text-xl font-black text-slate-800">Kitchen Inbox</h2>
           </div>
+          <p className="text-sm font-semibold text-slate-500 mb-6">Need less spice tomorrow? Traveling soon? Drop a note to the chefs.</p>
+          
+          {success && (
+            <div className="bg-emerald-50 border border-emerald-100 text-emerald-600 p-4 rounded-2xl text-sm font-bold mb-6 text-center animate-pulse">
+              {success}
+            </div>
+          )}
+          
+          <form onSubmit={sendFeedback}>
+            <textarea 
+              required
+              value={feedbackMsg}
+              onChange={e => setFeedbackMsg(e.target.value)}
+              className="w-full bg-slate-100/50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-medium text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all duration-300 mb-4 resize-none" 
+              rows="3"
+              placeholder="Ex: Please add less spice for tomorrow's lunch..."
+            ></textarea>
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white py-4 rounded-2xl text-sm font-black tracking-wide shadow-[0_10px_20px_-10px_rgba(99,102,241,0.5)] hover:shadow-[0_15px_25px_-10px_rgba(99,102,241,0.6)] transform hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.97] disabled:opacity-50"
+            >
+              {loading ? 'Sending...' : 'Send Message'}
+            </button>
+          </form>
         </div>
 
       </div>
