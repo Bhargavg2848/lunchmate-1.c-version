@@ -12,6 +12,7 @@
     "@hcaptcha/react-hcaptcha": "^2.0.2",
     "@supabase/supabase-js": "^2.110.7",
     "@turf/turf": "^7.4.0",
+    "axios": "^1.19.0",
     "fuse.js": "^7.5.0",
     "hcaptcha": "^0.2.0",
     "jspdf": "^4.2.1",
