@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate, Link } from 'react-router-dom';
+import ExpiringAlerts from '../components/ExpiringAlerts';
 
 export default function Subscriptions() {
   const [subs, setSubs] = useState([]);
@@ -62,6 +63,9 @@ export default function Subscriptions() {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       
+      {/* ⚠️ The New Intelligent Alerts Module */}
+      <ExpiringAlerts />
+
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">LUNCHMATE CUSTOMER TRACKER</h1>
         
@@ -108,7 +112,6 @@ export default function Subscriptions() {
         </div>
       </div>
 
-      
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <table className="w-full text-left text-sm">
           <thead className="bg-gray-50 border-b">
@@ -142,4 +145,3 @@ export default function Subscriptions() {
     </div>
   );
 }
-
