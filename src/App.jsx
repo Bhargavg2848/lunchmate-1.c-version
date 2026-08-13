@@ -1,4 +1,5 @@
-﻿import CustomerPortal from './pages/CustomerPortal';
+﻿import CustomerPortalWrapper from './components/CustomerPortalWrapper';
+import CustomerPortal from './pages/CustomerPortal';
 import DomainRouter from './components/DomainRouter';
 import DriverMode from './pages/DriverMode';
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
@@ -95,5 +96,6 @@ export default function App() {
     </HashRouter>
   )
 }
+
 
 
