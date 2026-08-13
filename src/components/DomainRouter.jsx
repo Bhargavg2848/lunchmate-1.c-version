@@ -7,10 +7,15 @@ export default function DomainRouter() {
 
   useEffect(() => {
     const hostname = window.location.hostname
-    // If they visit the root page using the delivery subdomain...
+    
+    // Route for Delivery Executives
     if (hostname.startsWith('delivery.') && location.pathname === '/') {
-      // Instantly push them into the Driver Mode interface
       navigate('/driver', { replace: true })
+    }
+    
+    // Route for Customers
+    if (hostname.startsWith('customer.') && location.pathname === '/') {
+      navigate('/portal', { replace: true })
     }
   }, [navigate, location])
 

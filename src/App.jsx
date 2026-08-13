@@ -1,4 +1,5 @@
-﻿import DomainRouter from './components/DomainRouter';
+﻿import CustomerPortal from './pages/CustomerPortal';
+import DomainRouter from './components/DomainRouter';
 import DriverMode from './pages/DriverMode';
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
 import MenuManager from './pages/MenuManager.jsx'
@@ -87,10 +88,12 @@ export default function App() {
             
             <Route path="/menu" element={<MenuManager />} />
             <Route path="/driver" element={<DriverMode />} />
+          <Route path="/portal" element={<CustomerPortal />} />
         </Routes>
         </main>
       </div>
     </HashRouter>
   )
 }
+
 
