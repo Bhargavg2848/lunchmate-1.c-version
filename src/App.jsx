@@ -1,7 +1,8 @@
-﻿import CustomerPortalWrapper from './components/CustomerPortalWrapper';
+﻿import React from 'react';
+import CustomerPortalWrapper from './components/CustomerPortalWrapper';
 import DomainRouter from './components/DomainRouter';
 import DriverMode from './pages/DriverMode';
-import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
+import { HashRouter, NavLink, Route, Routes, Navigate } from 'react-router-dom'
 import MenuManager from './pages/MenuManager.jsx'
 import NewOrder from './pages/NewOrder.jsx'
 import Deliveries from './pages/Deliveries.jsx'
@@ -18,7 +19,7 @@ function navClass(isActive) {
   }`
 }
 
-// 🔒 Admin Layout: Contains the Supabase Bouncer AND the Navigation Bar
+// 🔒 Admin Layout
 function AdminLayout({ children }) {
   return (
     <Auth>
@@ -45,18 +46,34 @@ function AdminLayout({ children }) {
   )
 }
 
+// 🔀 Smart Router for the root URL ("/")
+function SmartRoot() {
+  // If the customer visits the base URL, send them straight to the portal
+  if (window.location.hostname === 'customer.lunchmate.live') {
+    return <Navigate to="/portal" replace />;
+  }
+  // Otherwise, load the secure Admin New Order page
+  return (
+    <AdminLayout>
+      <NewOrder />
+    </AdminLayout>
+  );
+}
+
 export default function App() {
   return (
     <HashRouter>
       <Routes>
-        {/* 🟢 CUSTOMER PORTAL - COMPLETELY OUTSIDE AUTH AND NAVBAR */}
+        {/* 🟢 CUSTOMER PORTAL */}
         <Route path="/portal/*" element={<CustomerPortalWrapper />} />
 
-        {/* 🔴 ADMIN OS - SECURELY WRAPPED */}
+        {/* 🔀 SMART ROOT ROUTE */}
+        <Route path="/" element={<SmartRoot />} />
+
+        {/* 🔴 ADMIN OS */}
         <Route path="/*" element={
           <AdminLayout>
             <Routes>
-              <Route path="/" element={<NewOrder />} />
               <Route path="/deliveries" element={<Deliveries />} />
               <Route path="/kitchen" element={<KitchenDashboard />} />
               <Route path="/roster" element={<DeliveryRoster />} />
