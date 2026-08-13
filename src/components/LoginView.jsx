@@ -1,11 +1,6 @@
 ﻿import React, { useState } from "react";
 import { ChefHat, ShieldCheck, Sparkles } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
-
-// Initialize Supabase client safely for the customer portal
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "YOUR_SUPABASE_URL";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY";
-const supabase = (supabaseUrl && supabaseUrl !== "YOUR_SUPABASE_URL") ? createClient(supabaseUrl, supabaseAnonKey) : null;
+import { supabase } from "../lib/supabase";
 
 export default function LoginView() {
   const [loading, setLoading] = useState(false);
@@ -16,22 +11,6 @@ export default function LoginView() {
     setErrorMsg("");
 
     try {
-      if (!supabase) {
-        // Fallback simulation if Supabase keys aren't compiled in frontend env yet
-        setTimeout(() => {
-          localStorage.setItem("lunchmate_customer", JSON.stringify({
-            name: "Venkat Customer",
-            email: "customer@lunchmate.live",
-            credits: 12,
-            totalCredits: 20,
-            balanceDue: 500
-          }));
-          window.location.reload();
-        }, 800);
-        return;
-      }
-
-      // Secure native Supabase Google OAuth redirect
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -66,7 +45,7 @@ export default function LoginView() {
         <button 
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full h-14 bg-white text-slate-900 font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-gray-100 active:scale-95 transition-all mb-4 shadow-lg"
+          className="w-full h-14 bg-white text-slate-900 font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-gray-100 active:scale-95 transition-all mb-4 shadow-lg cursor-pointer"
         >
           {loading ? "Connecting to Google..." : (
             <>
