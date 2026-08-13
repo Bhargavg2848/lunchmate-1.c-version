@@ -1,14 +1,15 @@
 ﻿import React, { useState } from "react";
-import { ChefHat, ShieldCheck, Sparkles, Mail } from "lucide-react";
+import { ChefHat, ShieldCheck, Sparkles } from "lucide-react";
 
 export default function LoginView() {
   const [loading, setLoading] = useState(false);
 
   const handleGoogleSignIn = () => {
     setLoading(true);
-    // Redirects to Emergent Auth, which then hits your FastAPI backend
+    // Safely redirect strictly to YOUR backend API, avoiding third-party domains
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
     const redirectUrl = window.location.origin + "/#/portal";
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+    window.location.href = `${backendUrl}/api/auth/google?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
   return (
