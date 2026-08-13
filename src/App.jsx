@@ -1,3 +1,4 @@
+﻿import DriverMode from './pages/DriverMode';
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
 import MenuManager from './pages/MenuManager.jsx'
 import NewOrder from './pages/NewOrder.jsx'
@@ -83,7 +84,8 @@ export default function App() {
             <Route path="/tracker" element={<CustomerTracker />} />
             
             <Route path="/menu" element={<MenuManager />} />
-          </Routes>
+            <Route path="/driver" element={<DriverMode />} />
+        </Routes>
         </main>
       </div>
     </HashRouter>
