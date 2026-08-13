@@ -1,33 +1,42 @@
 ﻿import React, { useEffect, useState } from "react";
 import LoginView from "./LoginView";
 import DashboardView from "./DashboardView";
+import { supabase } from "../lib/supabase";
 
 export default function CustomerPortalWrapper() {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('lunchmate_customer');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check URL hash for OAuth tokens or session returns safely without protocol triggers
-    const hash = window.location.hash || "";
-    if (hash.includes("access_token") || hash.includes("session_id")) {
-      setLoading(true);
-      setTimeout(() => {
-        const mockUser = {
-          name: "Valued Customer",
-          email: "customer@lunchmate.live",
+    // Check active session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser({
+          name: session.user.user_metadata?.full_name || session.user.email.split("@")[0],
+          email: session.user.email,
           credits: 12,
           totalCredits: 20,
           balanceDue: 500
-        };
-        setUser(mockUser);
-        localStorage.setItem('lunchmate_customer', JSON.stringify(mockUser));
-        window.location.hash = "#/portal";
-        setLoading(false);
-      }, 500);
-    }
+        });
+      }
+      setLoading(false);
+    });
+
+    // Listen for auth state changes (Google OAuth callback return)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          name: session.user.user_metadata?.full_name || session.user.email.split("@")[0],
+          email: session.user.email,
+          credits: 12,
+          totalCredits: 20,
+          balanceDue: 500
+        });
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   if (loading) {
@@ -45,8 +54,8 @@ export default function CustomerPortalWrapper() {
   return (
     <DashboardView 
       user={user} 
-      onLogout={() => {
-        localStorage.removeItem('lunchmate_customer');
+      onLogout={async () => {
+        await supabase.auth.signOut();
         setUser(null);
       }} 
     />
