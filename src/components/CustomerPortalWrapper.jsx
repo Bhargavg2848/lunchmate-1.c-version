@@ -1,80 +1,56 @@
-﻿import React, { useEffect, useState } from "react";
-import LoginView from "./LoginView";
+import React, { useState, useEffect } from "react";
+import { useUser, useClerk } from "@clerk/clerk-react";
 import DashboardView from "./DashboardView";
 import { supabase } from "../lib/supabase";
+import AccountLinkBridge from "./AccountLinkBridge";
 
 export default function CustomerPortalWrapper() {
-  const [user, setUser] = useState(null);
+  const { user: clerkUser } = useUser();
+  const { signOut } = useClerk();
+  const [customerData, setCustomerData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [needsLinking, setNeedsLinking] = useState(false);
+
+  const fetchCustomerRecord = async () => {
+    if (!clerkUser) return;
+    setLoading(true);
+
+    try {
+      // 1. Check if this Clerk user is already linked to a Supabase customer
+      const { data, error } = await supabase
+        .from("customers")
+        .select("*")
+        .eq("clerk_user_id", clerkUser.id)
+        .single();
+
+      if (data) {
+        // 2. Account is linked! Map the data for DashboardView
+        setCustomerData({
+          ...data,
+          name: data.name || clerkUser.fullName,
+          email: clerkUser.primaryEmailAddress?.emailAddress || "",
+          // Temporarily preserving your dummy variables until you connect the live tables
+          credits: 12,
+          totalCredits: 20,
+          balanceDue: 500
+        });
+        setNeedsLinking(false);
+      } else {
+        // 3. No linked account found. Trigger the OTP bridge.
+        setNeedsLinking(true);
+      }
+    } catch (err) {
+      console.error("Error fetching customer data:", err);
+      // Supabase throws an error if .single() finds 0 rows, so we trigger the bridge
+      setNeedsLinking(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const handleAuthCallback = async () => {
-      const hash = window.location.hash || "";
-      
-      // Handle OAuth token trapped by HashRouter
-      if (hash.includes("access_token")) {
-        try {
-          const cleanHash = hash.replace("#/portal#", "&").replace("#", "&");
-          const params = new URLSearchParams(cleanHash);
-          const accessToken = params.get("access_token");
-          const refreshToken = params.get("refresh_token");
-
-          if (accessToken) {
-            const { data, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken || "",
-            });
-            if (error) throw error;
-            if (data?.session?.user) {
-              const u = data.session.user;
-              setUser({
-                name: u.user_metadata?.full_name || u.email.split("@")[0],
-                email: u.email,
-                credits: 12,
-                totalCredits: 20,
-                balanceDue: 500
-              });
-              window.location.hash = "#/portal";
-              setLoading(false);
-              return;
-            }
-          }
-        } catch (err) {
-          console.error("Auth session error:", err);
-        }
-      }
-
-      // Check standard active session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser({
-          name: session.user.user_metadata?.full_name || session.user.email.split("@")[0],
-          email: session.user.email,
-          credits: 12,
-          totalCredits: 20,
-          balanceDue: 500
-        });
-      }
-      setLoading(false);
-    };
-
-    handleAuthCallback();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser({
-          name: session.user.user_metadata?.full_name || session.user.email.split("@")[0],
-          email: session.user.email,
-          credits: 12,
-          totalCredits: 20,
-          balanceDue: 500
-        });
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    fetchCustomerRecord();
+  }, [clerkUser]);
 
   if (loading) {
     return (
@@ -84,17 +60,19 @@ export default function CustomerPortalWrapper() {
     );
   }
 
-  if (!user) {
-    return <LoginView />;
+  // Intercept the user with the bridging component if they aren't linked yet
+  if (needsLinking) {
+    return <AccountLinkBridge onLinked={fetchCustomerRecord} />;
+  }
+
+  if (!customerData) {
+    return null;
   }
 
   return (
-    <DashboardView 
-      user={user} 
-      onLogout={async () => {
-        await supabase.auth.signOut();
-        setUser(null);
-      }} 
+    <DashboardView
+      user={customerData}
+      onLogout={() => signOut()}
     />
   );
 }
