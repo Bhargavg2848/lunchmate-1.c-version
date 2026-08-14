@@ -118,3 +118,5 @@ export default function App() {
     </HashRouter>
   )
 }
+
+console.log('Cache Bust 1.0');
