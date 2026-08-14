@@ -1,17 +1,20 @@
 import React from 'react';
+import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import CustomerPortalWrapper from './components/CustomerPortalWrapper';
 import DomainRouter from './components/DomainRouter';
 import DriverMode from './pages/DriverMode';
-import { HashRouter, NavLink, Route, Routes, Navigate } from 'react-router-dom'
-import MenuManager from './pages/MenuManager.jsx'
-import NewOrder from './pages/NewOrder.jsx'
-import Deliveries from './pages/Deliveries.jsx'
-import Subscriptions from './pages/Subscriptions.jsx'
-import SubscriptionDetails from './pages/SubscriptionDetails.jsx'
-import KitchenDashboard from './pages/KitchenDashboard.jsx'
-import DeliveryRoster from './pages/DeliveryRoster.jsx'
-import CustomerTracker from './CustomerTracker.jsx'
-import Auth from './components/Auth.jsx'
+import { HashRouter, NavLink, Route, Routes, Navigate } from 'react-router-dom';
+import MenuManager from './pages/MenuManager.jsx';
+import NewOrder from './pages/NewOrder.jsx';
+import Deliveries from './pages/Deliveries.jsx';
+import Subscriptions from './pages/Subscriptions.jsx';
+import SubscriptionDetails from './pages/SubscriptionDetails.jsx';
+import KitchenDashboard from './pages/KitchenDashboard.jsx';
+import DeliveryRoster from './pages/DeliveryRoster.jsx';
+import CustomerTracker from './CustomerTracker.jsx';
+import Auth from './components/Auth.jsx';
+
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 function navClass(isActive) {
   return `px-3 py-1.5 rounded-md text-sm font-medium ${
@@ -48,29 +51,51 @@ function AdminLayout({ children }) {
 export default function App() {
   const hostname = window.location.hostname;
 
-  // 1. DELIVERY SUBDOMAIN: Exclusively load Driver Mode
+  // 1. DELIVERY SUBDOMAIN: Exclusively load Driver Mode with Clerk Auth
   if (hostname.includes('delivery.')) {
     return (
-      <HashRouter>
-        <Routes>
-          <Route path="*" element={<DriverMode />} />
-        </Routes>
-      </HashRouter>
+      <ClerkProvider publishableKey={clerkPubKey}>
+        <HashRouter>
+          <Routes>
+            <Route path="*" element={
+              <>
+                <SignedIn>
+                  <DriverMode />
+                </SignedIn>
+                <SignedOut>
+                  <RedirectToSignIn />
+                </SignedOut>
+              </>
+            } />
+          </Routes>
+        </HashRouter>
+      </ClerkProvider>
     );
   }
 
-  // 2. CUSTOMER SUBDOMAIN: Exclusively load Customer Portal
+  // 2. CUSTOMER SUBDOMAIN: Exclusively load Customer Portal with Clerk Auth
   if (hostname.includes('customer.')) {
     return (
-      <HashRouter>
-        <Routes>
-          <Route path="*" element={<CustomerPortalWrapper />} />
-        </Routes>
-      </HashRouter>
+      <ClerkProvider publishableKey={clerkPubKey}>
+        <HashRouter>
+          <Routes>
+            <Route path="*" element={
+              <>
+                <SignedIn>
+                  <CustomerPortalWrapper />
+                </SignedIn>
+                <SignedOut>
+                  <RedirectToSignIn />
+                </SignedOut>
+              </>
+            } />
+          </Routes>
+        </HashRouter>
+      </ClerkProvider>
     );
   }
 
-  // 3. ADMIN SUBDOMAIN (or fallback): Load secure Lunchmate OS Dashboard
+  // 3. ADMIN SUBDOMAIN (or fallback): Load secure Lunchmate OS Dashboard (Supabase Auth)
   return (
     <HashRouter>
       <Routes>
