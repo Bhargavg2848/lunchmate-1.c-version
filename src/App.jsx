@@ -51,10 +51,10 @@ function AdminLayout({ children }) {
 export default function App() {
   const hostname = window.location.hostname;
 
-  // 1. DELIVERY SUBDOMAIN: Exclusively load Driver Mode with Clerk Auth
+  // 1. DELIVERY SUBDOMAIN
   if (hostname.includes('delivery.')) {
     return (
-      <ClerkProvider publishableKey={clerkPubKey}>
+      <ClerkProvider publishableKey={clerkPubKey} afterSignOutUrl="https://delivery.lunchmate.live">
         <HashRouter>
           <Routes>
             <Route path="*" element={
@@ -63,7 +63,7 @@ export default function App() {
                   <DriverMode />
                 </SignedIn>
                 <SignedOut>
-                  <RedirectToSignIn />
+                  <RedirectToSignIn redirectUrl="https://delivery.lunchmate.live" />
                 </SignedOut>
               </>
             } />
@@ -73,10 +73,10 @@ export default function App() {
     );
   }
 
-  // 2. CUSTOMER SUBDOMAIN: Exclusively load Customer Portal with Clerk Auth
+  // 2. CUSTOMER SUBDOMAIN
   if (hostname.includes('customer.')) {
     return (
-      <ClerkProvider publishableKey={clerkPubKey}>
+      <ClerkProvider publishableKey={clerkPubKey} afterSignOutUrl="https://customer.lunchmate.live">
         <HashRouter>
           <Routes>
             <Route path="*" element={
@@ -85,7 +85,7 @@ export default function App() {
                   <CustomerPortalWrapper />
                 </SignedIn>
                 <SignedOut>
-                  <RedirectToSignIn />
+                  <RedirectToSignIn redirectUrl="https://customer.lunchmate.live" />
                 </SignedOut>
               </>
             } />
@@ -95,7 +95,7 @@ export default function App() {
     );
   }
 
-  // 3. ADMIN SUBDOMAIN (or fallback): Load secure Lunchmate OS Dashboard (Supabase Auth)
+  // 3. ADMIN SUBDOMAIN (or fallback)
   return (
     <HashRouter>
       <Routes>
