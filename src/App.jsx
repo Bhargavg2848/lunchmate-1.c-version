@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import CustomerPortalWrapper from './components/CustomerPortalWrapper';
 import DomainRouter from './components/DomainRouter';
 import DriverMode from './pages/DriverMode';
@@ -46,18 +46,34 @@ function AdminLayout({ children }) {
 }
 
 export default function App() {
-  const isCustomerDomain = window.location.hostname === 'customer.lunchmate.live';
+  const hostname = window.location.hostname;
 
+  // 1. DELIVERY SUBDOMAIN: Exclusively load Driver Mode
+  if (hostname.includes('delivery.')) {
+    return (
+      <HashRouter>
+        <Routes>
+          <Route path="*" element={<DriverMode />} />
+        </Routes>
+      </HashRouter>
+    );
+  }
+
+  // 2. CUSTOMER SUBDOMAIN: Exclusively load Customer Portal
+  if (hostname.includes('customer.')) {
+    return (
+      <HashRouter>
+        <Routes>
+          <Route path="*" element={<CustomerPortalWrapper />} />
+        </Routes>
+      </HashRouter>
+    );
+  }
+
+  // 3. ADMIN SUBDOMAIN (or fallback): Load secure Lunchmate OS Dashboard
   return (
     <HashRouter>
       <Routes>
-        {/* If on customer domain, default straight to portal */}
-        {isCustomerDomain && <Route path="/" element={<Navigate to="/portal" replace />} />}
-
-        {/* CUSTOMER PORTAL */}
-        <Route path="/portal" element={<CustomerPortalWrapper />} />
-
-        {/* ADMIN OS */}
         <Route path="/*" element={
           <AdminLayout>
             <Routes>
