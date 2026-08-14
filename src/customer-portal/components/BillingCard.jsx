@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useState } from 'react'
 import { ReceiptText, ExternalLink, FileDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { generateSubscriptionInvoice } from '../../lib/pdfGenerator'
@@ -16,6 +17,20 @@ const STATE_STYLES = {
 const PAYMENT_LABEL = { not_paid: 'Not paid', partial: 'Partially paid', paid: 'Paid' }
 
 export default function BillingCard({ subscription, transactions }) {
+  const [generating, setGenerating] = useState(false)
+
+  const downloadInvoice = async () => {
+    setGenerating(true)
+    try {
+      const result = await generateSubscriptionInvoice(subscription)
+      if (result?.error) throw new Error(result.error)
+    } catch {
+      toast.error("We couldn't generate your invoice. Please try again.")
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   if (!subscription) {
     return (
       <section className="lmp-card p-5 sm:p-6" id="billing" data-testid="billing-section-card">
@@ -31,19 +46,6 @@ export default function BillingCard({ subscription, transactions }) {
   const stateClass = STATE_STYLES[state] ?? STATE_STYLES.completed
   const total = subscription.revised_total_amount ?? subscription.original_total_amount
   const invoiceTx = (transactions ?? []).find((t) => t.invoice_url)
-  const [generating, setGenerating] = useState(false)
-
-  const downloadInvoice = async () => {
-    setGenerating(true)
-    try {
-      const result = await generateSubscriptionInvoice(subscription)
-      if (result?.error) throw new Error(result.error)
-    } catch {
-      toast.error("We couldn't generate your invoice. Please try again.")
-    } finally {
-      setGenerating(false)
-    }
-  }
 
   return (
     <section className="lmp-card p-5 sm:p-6" id="billing" data-testid="billing-section-card">
