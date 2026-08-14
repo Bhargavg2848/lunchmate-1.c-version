@@ -1,6 +1,5 @@
 import React from 'react';
 import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
-import CustomerPortalWrapper from './components/CustomerPortalWrapper';
 import DomainRouter from './components/DomainRouter';
 import DriverMode from './pages/DriverMode';
 import { HashRouter, NavLink, Route, Routes, Navigate } from 'react-router-dom';
@@ -10,6 +9,9 @@ import Deliveries from './pages/Deliveries.jsx';
 import Subscriptions from './pages/Subscriptions.jsx';
 import SubscriptionDetails from './pages/SubscriptionDetails.jsx';
 import KitchenDashboard from './pages/KitchenDashboard.jsx';
+import AdminInbox from './components/AdminInbox.jsx';
+import LandingPage from './pages/LandingPage.jsx';
+import CustomerPortalApp from './customer-portal/CustomerPortalApp.jsx';
 import DeliveryRoster from './pages/DeliveryRoster.jsx';
 import CustomerTracker from './CustomerTracker.jsx';
 import Auth from './components/Auth.jsx';
@@ -33,6 +35,7 @@ function AdminLayout({ children }) {
               <NavLink to="/" end className={({ isActive }) => navClass(isActive)}>New Order</NavLink>
               <NavLink to="/deliveries" className={({ isActive }) => navClass(isActive)}>Deliveries</NavLink>
               <NavLink to="/kitchen" className={({ isActive }) => navClass(isActive)}>Kitchen</NavLink>
+              <NavLink to="/inbox" className={({ isActive }) => navClass(isActive)}>Inbox</NavLink>
               <NavLink to="/roster" className={({ isActive }) => navClass(isActive)}>Roster</NavLink>
               <NavLink to="/subscriptions" className={({ isActive }) => navClass(isActive)}>Subscriptions</NavLink>
               <NavLink to="/menu" className={({ isActive }) => navClass(isActive)}>Menu & Pricing</NavLink>
@@ -50,6 +53,11 @@ function AdminLayout({ children }) {
 
 export default function App() {
   const hostname = window.location.hostname;
+
+  // 0. ROOT DOMAIN — public landing page (no auth)
+  if (hostname === 'lunchmate.live' || hostname === 'www.lunchmate.live') {
+    return <LandingPage />;
+  }
 
   // 1. DELIVERY SUBDOMAIN
   if (hostname.includes('delivery.')) {
@@ -82,7 +90,7 @@ export default function App() {
             <Route path="*" element={
               <>
                 <SignedIn>
-                  <CustomerPortalWrapper />
+                  <CustomerPortalApp />
                 </SignedIn>
                 <SignedOut>
                   <RedirectToSignIn redirectUrl="https://customer.lunchmate.live" />
@@ -105,6 +113,7 @@ export default function App() {
               <Route path="/" element={<NewOrder />} />
               <Route path="/deliveries" element={<Deliveries />} />
               <Route path="/kitchen" element={<KitchenDashboard />} />
+              <Route path="/inbox" element={<AdminInbox />} />
               <Route path="/roster" element={<DeliveryRoster />} />
               <Route path="/subscriptions" element={<Subscriptions />} />
               <Route path="/subscriptions/:orderId" element={<SubscriptionDetails />} />

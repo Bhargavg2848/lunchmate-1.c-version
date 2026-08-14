@@ -1,9 +1,24 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayDateString } from '../lib/date'
 import Alert from '../components/Alert'
+import { Phone, Navigation, Check, Sparkles, Truck, CircleCheck } from 'lucide-react'
 
 const KITCHEN_COORDS = [82.234376, 16.968230] // Longitude, Latitude
+
+function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-3xl border border-[#E5E2DA] overflow-hidden shadow-[0_4px_24px_-4px_rgba(30,58,43,0.06)]">
+      <div className="h-8 bg-[#F3F0EA]" />
+      <div className="p-5 space-y-3">
+        <div className="h-5 w-32 bg-[#F3F0EA] rounded-lg animate-pulse" />
+        <div className="h-3.5 w-48 bg-[#F3F0EA] rounded-lg animate-pulse" />
+        <div className="h-12 w-full bg-[#F3F0EA] rounded-2xl animate-pulse" />
+        <div className="h-11 w-full bg-[#F3F0EA] rounded-2xl animate-pulse" />
+      </div>
+    </div>
+  )
+}
 
 export default function DriverMode() {
   const [deliveries, setDeliveries] = useState([])
@@ -82,7 +97,7 @@ export default function DriverMode() {
   async function optimizeDriverRoute() {
     const pendingList = deliveries.filter(d => d.status === 'pending')
     const validStops = pendingList.filter(d => d.orders?.customers?.latitude && d.orders?.customers?.longitude)
-    
+
     if (validStops.length === 0) {
       setError('No pending deliveries have valid map coordinates.')
       return
@@ -98,14 +113,14 @@ export default function DriverMode() {
     try {
       // Create coordinate string with Kitchen as start point
       const coordStrings = [
-        KITCHEN_COORDS.join(','), 
+        KITCHEN_COORDS.join(','),
         ...validStops.map(d => `${d.orders.customers.longitude},${d.orders.customers.latitude}`)
       ]
-      
+
       const url = `https://router.project-osrm.org/trip/v1/driving/${coordStrings.join(';')}?source=first&roundtrip=false`
       const res = await fetch(url)
       const data = await res.json()
-      
+
       if (data.code !== 'Ok') throw new Error('Routing calculation failed.')
 
       // Map sequence back to delivery IDs
@@ -116,7 +131,7 @@ export default function DriverMode() {
 
       mappedSequence.sort((a, b) => a.routePosition - b.routePosition)
       setOptimizedSequence(mappedSequence.map(m => m.id))
-      
+
     } catch (err) {
       setError('Route batching failed: ' + err.message)
     } finally {
@@ -130,7 +145,7 @@ export default function DriverMode() {
   }
 
   const completedDeliveries = deliveries.filter(d => d.status !== 'pending')
-  
+
   // Apply sorting logic to pending deliveries
   let pendingDeliveries = deliveries.filter(d => d.status === 'pending')
   if (optimizedSequence.length > 0) {
@@ -145,41 +160,43 @@ export default function DriverMode() {
 
   const currentList = activeTab === 'pending' ? pendingDeliveries : completedDeliveries
 
-  if (loading) return (
-    <div className="fixed inset-0 z-[9999] bg-slate-50 flex flex-col items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-emerald-600 mb-4"></div>
-      <p className="text-slate-500 font-medium animate-pulse">Syncing route data...</p>
-    </div>
-  )
-
   return (
-    <div className="fixed inset-0 z-[9999] bg-slate-50 overflow-y-auto font-sans pb-24">
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-emerald-800 to-emerald-600 text-white px-5 py-4 shadow-md">
+    <div className="fixed inset-0 z-[9999] bg-[#FAF8F5] overflow-y-auto font-sans pb-24">
+      {/* Subtle floating decorations */}
+      <div aria-hidden="true" className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <span className="absolute left-[6%] top-[14%] text-2xl opacity-[0.14] animate-float-slow select-none">🍃</span>
+        <span className="absolute right-[8%] top-[24%] text-xl opacity-[0.12] animate-float-delayed select-none">🥕</span>
+        <span className="absolute left-[12%] bottom-[16%] text-xl opacity-[0.12] animate-float-delayed select-none">🍅</span>
+      </div>
+
+      <header className="sticky top-0 z-50 bg-[#1E3A2B]/95 backdrop-blur-md text-[#FAF8F5] px-5 py-4 shadow-[0_4px_20px_-4px_rgba(30,58,43,0.3)]">
         <div className="flex justify-between items-center max-w-lg mx-auto">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight">Driver Hub</h1>
-            <p className="text-emerald-100 text-xs font-medium opacity-90 mt-0.5">{todayDateString()}</p>
+            <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
+              <Truck size={19} strokeWidth={2} /> Driver Hub
+            </h1>
+            <p className="text-[#9CB0A5] text-xs font-medium mt-0.5">{todayDateString()} · Kakinada</p>
           </div>
-          <div className="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-inner">
-            <span className="text-sm font-bold tracking-wide">{pendingDeliveries.length} Left</span>
+          <div className="bg-white/10 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/15">
+            <span className="text-sm font-semibold tracking-wide">{pendingDeliveries.length} left</span>
           </div>
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto w-full px-4 pt-5 pb-2">
-        <div className="flex p-1 bg-slate-200/80 rounded-xl shadow-inner">
-          <button 
+      <div className="relative z-10 max-w-lg mx-auto w-full px-4 pt-5 pb-2">
+        <div className="flex p-1 bg-[#F3F0EA] rounded-2xl border border-[#E5E2DA]">
+          <button
             onClick={() => setActiveTab('pending')}
-            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all duration-300 ease-out ${
-              activeTab === 'pending' ? 'bg-white text-emerald-800 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.12)] scale-100' : 'text-slate-500 hover:text-slate-700 scale-95 opacity-80'
+            className={`flex-1 py-2.5 text-sm font-semibold rounded-xl transition-all duration-300 ease-out active:scale-[0.97] ${
+              activeTab === 'pending' ? 'bg-white text-[#1E3A2B] shadow-[0_2px_8px_-2px_rgba(30,58,43,0.15)]' : 'text-[#808D85] hover:text-[#526058]'
             }`}
           >
             Pending ({pendingDeliveries.length})
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('completed')}
-            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all duration-300 ease-out ${
-              activeTab === 'completed' ? 'bg-white text-emerald-800 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.12)] scale-100' : 'text-slate-500 hover:text-slate-700 scale-95 opacity-80'
+            className={`flex-1 py-2.5 text-sm font-semibold rounded-xl transition-all duration-300 ease-out active:scale-[0.97] ${
+              activeTab === 'completed' ? 'bg-white text-[#1E3A2B] shadow-[0_2px_8px_-2px_rgba(30,58,43,0.15)]' : 'text-[#808D85] hover:text-[#526058]'
             }`}
           >
             Completed ({completedDeliveries.length})
@@ -187,35 +204,43 @@ export default function DriverMode() {
         </div>
       </div>
 
-      <div className="px-4 space-y-4 max-w-lg mx-auto mt-2">
+      <div className="relative z-10 px-4 space-y-4 max-w-lg mx-auto mt-2">
         <Alert type="error" message={error} onClose={() => setError('')} />
 
-        {/* 🪄 Smart Route Button (Only visible on Pending tab if there are deliveries) */}
+        {/* Smart Route Button (Only visible on Pending tab if there are deliveries) */}
         {activeTab === 'pending' && pendingDeliveries.length > 1 && (
-           <button 
+           <button
              onClick={optimizeDriverRoute}
              disabled={optimizing}
-             className="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold py-3.5 rounded-2xl text-sm transition-all duration-200 active:scale-95 shadow-sm mb-2 flex items-center justify-center gap-2 disabled:opacity-50"
+             className="w-full bg-white border border-[#DCE8E0] text-[#2E5B44] hover:bg-[#F0F5F2] hover:shadow-[0_6px_16px_-4px_rgba(46,91,68,0.18)] font-semibold py-3.5 rounded-2xl text-sm transition-all duration-200 ease-out active:scale-[0.97] shadow-sm mb-2 flex items-center justify-center gap-2 disabled:opacity-50"
            >
-             {optimizing ? 'Calculating Fastest Path...' : (
-               <>
-                 <span className="text-lg">🪄</span> Optimize My Route
-               </>
-             )}
-           </button>
+            {optimizing ? 'Calculating fastest path…' : (
+              <>
+                <Sparkles size={16} strokeWidth={2} /> Optimize my route
+              </>
+            )}
+          </button>
         )}
 
         {optimizedSequence.length > 0 && activeTab === 'pending' && (
-           <div className="bg-emerald-50 text-emerald-800 text-xs font-bold text-center py-2 rounded-xl border border-emerald-200">
-             ✅ Route perfectly sequenced for fastest delivery.
+           <div className="bg-[#F0F5F2] text-[#2E5B44] text-xs font-semibold text-center py-2.5 rounded-xl border border-[#DCE8E0] flex items-center justify-center gap-1.5">
+             <CircleCheck size={14} /> Route sequenced for fastest delivery.
            </div>
         )}
 
-        {currentList.length === 0 ? (
-          <div className="text-center p-10 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 mt-6 transition-all">
-            <div className="text-5xl mb-4 transform hover:scale-110 transition-transform duration-300">🎉</div>
-            <p className="text-slate-800 font-bold text-lg">{activeTab === 'pending' ? 'All caught up!' : 'No completed deliveries.'}</p>
-            <p className="text-slate-500 text-sm mt-1">{activeTab === 'pending' ? 'Take a break, you earned it.' : 'Check back later.'}</p>
+        {loading ? (
+          <div className="space-y-4 mt-2">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : currentList.length === 0 ? (
+          <div className="text-center p-10 bg-white rounded-3xl shadow-[0_4px_24px_-4px_rgba(30,58,43,0.06)] border border-[#E5E2DA] mt-6 transition-all">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-[#F0F5F2] flex items-center justify-center text-[#2E5B44]">
+              <CircleCheck size={22} strokeWidth={1.8} />
+            </div>
+            <p className="text-[#1A2420] font-bold text-lg">{activeTab === 'pending' ? 'All caught up!' : 'No completed deliveries.'}</p>
+            <p className="text-[#808D85] text-sm mt-1">{activeTab === 'pending' ? 'Take a break, you earned it.' : 'Check back later.'}</p>
           </div>
         ) : (
           currentList.map((d, index) => {
@@ -226,56 +251,56 @@ export default function DriverMode() {
             if (dt === 'non_vegetarian' || name.includes('non-veg') || name.includes('chicken') || name.includes('egg')) type = 'Non-Veg'
 
             return (
-              <div key={d.id} className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-shadow duration-300 relative">
-                
+              <div key={d.id} className="bg-white rounded-3xl shadow-[0_4px_24px_-4px_rgba(30,58,43,0.06)] border border-[#E5E2DA] overflow-hidden hover:shadow-[0_8px_28px_-6px_rgba(30,58,43,0.12)] transition-shadow duration-300 relative">
+
                 {activeTab === 'pending' && optimizedSequence.length > 0 && optimizedSequence.includes(d.id) && (
-                  <div className="absolute top-4 right-4 bg-indigo-600 text-white font-black h-8 w-8 rounded-full flex items-center justify-center shadow-md border-2 border-white z-10">
+                  <div className="absolute top-4 right-4 bg-[#1E3A2B] text-white font-bold h-8 w-8 rounded-full flex items-center justify-center shadow-md border-2 border-white z-10 text-sm">
                     {index + 1}
                   </div>
                 )}
 
-                <div className={`px-5 py-2.5 text-[11px] font-black uppercase tracking-widest flex justify-between items-center ${
-                  d.status === 'pending' ? 'bg-slate-100 text-slate-600 border-b border-slate-200' : d.status === 'delivered' ? 'bg-emerald-50 text-emerald-700 border-b border-emerald-100/50' : 'bg-rose-50 text-rose-700 border-b border-rose-100/50'
+                <div className={`px-5 py-2.5 text-[11px] font-bold uppercase tracking-widest flex justify-between items-center ${
+                  d.status === 'pending' ? 'bg-[#F3F0EA] text-[#526058] border-b border-[#E5E2DA]' : d.status === 'delivered' ? 'bg-[#F0F5F2] text-[#2E5B44] border-b border-[#DCE8E0]' : 'bg-[#FEF3C7] text-amber-800 border-b border-amber-700/10'
                 }`}>
                   <span>{d.status}</span>
-                  <span>{d.meal_slot}</span>
+                  <span className="capitalize">{d.meal_slot}</span>
                 </div>
 
                 <div className="p-5">
                   <div className="mb-4 pr-10">
-                    <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{cust.name}</h2>
-                    <p className="text-sm text-slate-500 mt-1.5 leading-relaxed font-medium">{cust.address}</p>
+                    <h2 className="text-lg font-bold text-[#1A2420] tracking-tight">{cust.name}</h2>
+                    <p className="text-sm text-[#526058] mt-1 leading-relaxed">{cust.address}</p>
                   </div>
 
-                  <div className="bg-slate-50 rounded-2xl p-3.5 mb-5 border border-slate-100">
+                  <div className="bg-[#FAF8F5] rounded-2xl p-3.5 mb-5 border border-[#E5E2DA]">
                     <div className="flex items-center gap-3">
-                      <div className={`h-3 w-3 rounded-full shadow-inner ${type === 'Veg' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-                      <p className="font-bold text-slate-800 text-sm">{d.meal_name_snapshot}</p>
+                      <div className={`h-3 w-3 rounded-full shadow-inner ${type === 'Veg' ? 'bg-[#2E5B44]' : 'bg-amber-700'}`}></div>
+                      <p className="font-semibold text-[#1A2420] text-sm">{d.meal_name_snapshot}</p>
                     </div>
                     {d.notes && (
-                      <div className="mt-2.5 flex items-start gap-2 bg-amber-50/80 p-2 rounded-xl border border-amber-100/50">
-                        <span className="text-amber-500 text-sm">⚠️</span>
-                        <p className="text-xs font-bold text-amber-800 pt-0.5 leading-relaxed">{d.notes}</p>
+                      <div className="mt-2.5 flex items-start gap-2 bg-[#FEF3C7]/70 p-2.5 rounded-xl border border-amber-700/10">
+                        <span className="text-amber-600 text-xs font-black pt-px">!</span>
+                        <p className="text-xs font-semibold text-amber-800 leading-relaxed">{d.notes}</p>
                       </div>
                     )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 mb-4">
-                    <a href={`tel:${cust.contact}`} className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 px-4 rounded-2xl text-sm transition-all duration-200 active:scale-95">
-                      <span className="text-lg">📞</span> Call
+                    <a href={`tel:${cust.contact}`} className="flex items-center justify-center gap-2 bg-[#F3F0EA] hover:bg-[#EAE5DC] text-[#1A2420] font-semibold py-3.5 px-4 rounded-2xl text-sm transition-all duration-200 ease-out active:scale-[0.97] border border-[#E5E2DA]">
+                      <Phone size={16} strokeWidth={2} /> Call
                     </a>
-                    <a href={getDirectionsLink(cust)} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-3.5 px-4 rounded-2xl text-sm transition-all duration-200 active:scale-95 shadow-sm">
-                      <span className="text-lg">🗺️</span> Navigate
+                    <a href={getDirectionsLink(cust)} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 bg-[#F0F5F2] hover:bg-[#E4EFE8] text-[#2E5B44] font-semibold py-3.5 px-4 rounded-2xl text-sm transition-all duration-200 ease-out active:scale-[0.97] border border-[#DCE8E0]">
+                      <Navigation size={16} strokeWidth={2} /> Navigate
                     </a>
                   </div>
 
                   {d.status === 'pending' && (
-                    <div className="grid grid-cols-3 gap-3 pt-4 border-t border-slate-100">
-                      <button disabled={updatingId === d.id} onClick={() => updateStatus(d, 'missed')} className="col-span-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-4 rounded-2xl text-sm transition-all duration-200 active:scale-95 disabled:opacity-50">
+                    <div className="grid grid-cols-3 gap-3 pt-4 border-t border-[#F3F0EA]">
+                      <button disabled={updatingId === d.id} onClick={() => updateStatus(d, 'missed')} className="col-span-1 bg-amber-700/10 hover:bg-amber-700/15 text-amber-800 font-semibold py-4 rounded-2xl text-sm transition-all duration-200 ease-out active:scale-[0.97] disabled:opacity-50 border border-amber-700/20">
                         Missed
                       </button>
-                      <button disabled={updatingId === d.id} onClick={() => updateStatus(d, 'delivered')} className="col-span-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-black py-4 rounded-2xl text-base shadow-[0_4px_14px_0_rgba(16,185,129,0.39)] transition-all duration-200 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
-                        {updatingId === d.id ? 'Saving...' : <><span className="text-lg">✓</span> DELIVERED</>}
+                      <button disabled={updatingId === d.id} onClick={() => updateStatus(d, 'delivered')} className="col-span-2 bg-[#1E3A2B] hover:bg-[#172E22] text-white font-bold py-4 rounded-2xl text-base shadow-[0_4px_14px_rgba(30,58,43,0.25)] hover:shadow-[0_8px_20px_rgba(30,58,43,0.3)] hover:-translate-y-px transition-all duration-200 ease-out active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2">
+                        {updatingId === d.id ? 'Saving…' : <><Check size={18} strokeWidth={2.5} /> DELIVERED</>}
                       </button>
                     </div>
                   )}
