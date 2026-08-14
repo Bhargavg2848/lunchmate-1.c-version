@@ -1,3 +1,23 @@
 ﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Apple-style smooth gesture easing */
+.apple-transition {
+  transition: all 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Floating Elements Physics */
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-15px) rotate(4deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+.animate-float-slow {
+  animation: float 7s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 8s ease-in-out 3s infinite;
+}
