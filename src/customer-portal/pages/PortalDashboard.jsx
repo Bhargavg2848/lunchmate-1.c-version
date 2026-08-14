@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import PortalHeader from '../components/PortalHeader'
 import FloatingBackground from '../components/FloatingBackground'
 import CreditsCard from '../components/CreditsCard'
-import BillingCard from '../components/BillingCard'
 import ScheduleCard from '../components/ScheduleCard'
 import KitchenInbox from '../components/KitchenInbox'
 import ReferralCard from '../components/ReferralCard'
@@ -64,12 +63,11 @@ export default function PortalDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lmp-stagger">
               <CreditsCard subscription={portal.subscription} />
-              <BillingCard subscription={portal.subscription} transactions={portal.transactions} />
+              <ReferralCard customer={customer} supabase={supabase} hasSubscription={!!portal.subscription} />
             </div>
 
             <ScheduleCard deliveries={portal.deliveries} skipDelivery={portal.skipDelivery} />
             <KitchenInbox messages={portal.messages} sendKitchenMessage={portal.sendKitchenMessage} />
-            <ReferralCard customer={customer} supabase={supabase} hasSubscription={!!portal.subscription} />
 
             <p className="text-center text-xs text-[#A8B3AC] pt-2 pb-6" data-testid="dashboard-footer">
               Lunchmate · {portal.business.city}, {portal.business.state}, {portal.business.country} ·{' '}

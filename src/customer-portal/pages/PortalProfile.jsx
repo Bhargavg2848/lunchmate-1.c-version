@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, BadgeCheck } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import PortalAvatar from '../components/PortalAvatar'
 import PortalHeader from '../components/PortalHeader'
@@ -29,6 +29,8 @@ export default function PortalProfile() {
   const portal = usePortalData(customer, supabase)
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const fileRef = useRef(null)
 
   useEffect(() => {
     if (customer && !form) {
@@ -80,6 +82,33 @@ export default function PortalProfile() {
         : [...f.dietary_preferences, opt],
     }))
 
+  const changePhoto = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingPhoto(true)
+    try {
+      await user.setProfileImage({ file })
+      await user.reload?.()
+      const url = user.imageUrl
+      if (url) {
+        const { data, error: upErr } = await supabase
+          .from('customers')
+          .update({ image_url: url })
+          .eq('id', customer.id)
+          .select()
+          .single()
+        if (upErr) throw upErr
+        if (data) setCustomer(data)
+      }
+      toast.success('Profile photo updated')
+    } catch {
+      toast.error("We couldn't update your photo. Please try again.")
+    } finally {
+      setUploadingPhoto(false)
+      e.target.value = ''
+    }
+  }
+
   const save = async (e) => {
     e.preventDefault()
     setSaving(true)
@@ -102,8 +131,6 @@ export default function PortalProfile() {
       if (upErr) throw upErr
       setCustomer(data)
 
-      // If this profile has no subscription yet, try to claim an admin-created
-      // customer record by phone number (links subscription, orders, invoices).
       if (!portal.subscription && form.phone) {
         try {
           const { data: claimed } = await supabase.rpc('claim_customer_by_phone', {
@@ -138,6 +165,19 @@ export default function PortalProfile() {
   const name = user?.fullName || customer?.name || 'Customer'
   const email = user?.primaryEmailAddress?.emailAddress || customer?.google_email || ''
 
+  const checks = [
+    { key: 'name', label: 'Add your full name', done: !!form.name.trim() },
+    { key: 'photo', label: 'Add a profile photo', done: !!(customer.image_url || user?.imageUrl) },
+    { key: 'phone', label: 'Add your phone number', done: !!form.phone.trim() },
+    { key: 'address', label: 'Add your delivery address', done: !!form.address.trim() },
+    { key: 'instructions', label: 'Add delivery instructions', done: !!form.delivery_instructions.trim() },
+    { key: 'diet', label: 'Choose dietary preferences', done: form.dietary_preferences.length > 0 },
+    { key: 'spice', label: 'Set spice preference', done: !!form.spice_preference },
+    { key: 'allergies', label: 'Add allergies (or type "None")', done: form.allergies.trim().length > 0 },
+  ]
+  const pct = Math.round((checks.filter((c) => c.done).length / checks.length) * 100)
+  const missing = checks.filter((c) => !c.done)
+
   return (
     <div className="min-h-screen relative">
       <FloatingBackground />
@@ -148,8 +188,28 @@ export default function PortalProfile() {
           <ArrowLeft size={15} /> Back to dashboard
         </Link>
 
-        <div className="flex items-center gap-4 mb-8 mt-4">
-          <PortalAvatar url={user?.imageUrl} name={name} size={72} imageTestId="profile-avatar-image" fallbackTestId="profile-avatar-fallback" className="shadow-sm" />
+        <div className="flex items-center gap-4 mb-6 mt-4">
+          <div className="relative shrink-0">
+            <PortalAvatar url={user?.imageUrl} name={name} size={72} imageTestId="profile-avatar-image" fallbackTestId="profile-avatar-fallback" className="shadow-sm" />
+            <button
+              type="button"
+              data-testid="profile-photo-button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploadingPhoto}
+              className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[#1E3A2B] text-white flex items-center justify-center shadow-md border-2 border-[#FAF8F5] transition-all duration-150 hover:bg-[#172E22] active:scale-95 cursor-pointer disabled:opacity-50"
+              aria-label="Change profile photo"
+            >
+              <Camera size={13} strokeWidth={2} />
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              data-testid="profile-photo-input"
+              onChange={changePhoto}
+            />
+          </div>
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#1A2420] truncate m-0" data-testid="profile-full-name">
               {name}
@@ -157,6 +217,33 @@ export default function PortalProfile() {
             <p className="text-sm text-[#526058] truncate m-0" data-testid="profile-email">{email}</p>
           </div>
         </div>
+
+        <section className="lmp-card p-5 sm:p-6 mb-6" data-testid="profile-completion-card">
+          <div className="flex items-center justify-between mb-3">
+            <p className="lmp-caption m-0">Profile completion</p>
+            <p className="text-sm font-semibold text-[#1E3A2B] m-0" data-testid="profile-completion-value">{pct}%</p>
+          </div>
+          <div className="h-2.5 rounded-full bg-[#F3F0EA] overflow-hidden">
+            <div
+              data-testid="profile-completion-bar"
+              className="h-full rounded-full bg-[#1E3A2B] transition-all duration-500 ease-out"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          {missing.length > 0 ? (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {missing.map((c) => (
+                <span key={c.key} data-testid={`profile-missing-${c.key}`} className="text-[11px] text-[#526058] bg-[#F3F0EA] border border-[#E5E2DA] rounded-full px-2.5 py-1">
+                  {c.label}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-[#2E5B44] mt-3 mb-0 flex items-center gap-1.5" data-testid="profile-complete-note">
+              <BadgeCheck size={13} /> Your profile is 100% complete — thank you!
+            </p>
+          )}
+        </section>
 
         <form onSubmit={save} className="space-y-6 lmp-stagger">
           <section className="lmp-card p-5 sm:p-6" data-testid="profile-personal-section">
@@ -288,7 +375,7 @@ export default function PortalProfile() {
           </section>
 
           <div className="flex items-center gap-3 pb-10">
-            <button type="submit" data-testid="profile-form-save-button" className="lmp-btn-primary" disabled={saving}>
+            <button type="submit" data-testid="profile-form-save-button" className="lmp-btn-primary" disabled={saving || uploadingPhoto}>
               {saving ? 'Saving…' : 'Save changes'}
             </button>
             <Link to="/" className="lmp-btn-ghost no-underline" data-testid="profile-cancel-link">Cancel</Link>

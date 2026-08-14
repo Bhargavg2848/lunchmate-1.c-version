@@ -59,7 +59,7 @@ export function usePortalData(customer, supabase) {
       if (orderIds.length > 0) {
         const { data: delData, error: delErr } = await supabase
           .from('deliveries')
-          .select('id, order_id, scheduled_date, status, meal_name_snapshot, meal_slot, skip_reason')
+          .select('id, order_id, scheduled_date, status, meal_name_snapshot, meal_slot, skip_reason, notes')
           .in('order_id', orderIds)
           .or(`scheduled_date.gte.${todayISO()},status.eq.pending`)
           .order('scheduled_date', { ascending: true })

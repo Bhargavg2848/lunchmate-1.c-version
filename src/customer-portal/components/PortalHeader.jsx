@@ -97,7 +97,7 @@ export default function PortalHeader({ user, subscription, business }) {
                 <button data-testid="menu-item-subscription" className={menuItem} onClick={() => goSection('/', 'subscription')}>
                   <CreditCard size={15} className="text-[#526058]" /> Subscription
                 </button>
-                <button data-testid="menu-item-billing" className={menuItem} onClick={() => goSection('/', 'billing')}>
+                <button data-testid="menu-item-billing" className={menuItem} onClick={() => { setOpen(false); navigate('/billing') }}>
                   <ReceiptText size={15} className="text-[#526058]" /> Billing &amp; Invoices
                 </button>
                 <button data-testid="menu-item-preferences" className={menuItem} onClick={() => goSection('/profile', 'preferences')}>
