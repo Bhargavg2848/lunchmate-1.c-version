@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useUser, useClerk } from "@clerk/clerk-react";
 import { supabase } from "../lib/supabase";
-import { Leaf } from "lucide-react"; // Make sure lucide-react is installed
+import { Leaf } from "lucide-react"; 
 
 export default function CustomerDashboard() {
   const { user } = useUser();
@@ -13,7 +13,6 @@ export default function CustomerDashboard() {
     async function fetchRealData() {
       if (!user) return;
       try {
-        // Fetch the REAL customer record from Supabase
         const { data, error } = await supabase
           .from("customers")
           .select("*")
@@ -73,7 +72,7 @@ export default function CustomerDashboard() {
           </button>
         </div>
 
-        {/* SUBSCRIPTION DATA (Ready to be wired to your orders table) */}
+        {/* SUBSCRIPTION DATA */}
         <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 p-8 rounded-3xl shadow-xl mb-6">
           <h2 className="text-emerald-400 font-semibold tracking-wider text-sm uppercase mb-2">Active Plan</h2>
           <h3 className="text-3xl font-bold text-white mb-6">South Indian Pack - Vegetarian</h3>
