@@ -108,7 +108,7 @@ export default function SubscriptionDetails() {
     let cancelled = false
     supabase
       .from('customers')
-      .select('google_email, image_url')
+      .select('google_email, image_url, gender, date_of_birth, alternate_contact, dietary_preferences, spice_preference, allergies, delivery_instructions')
       .eq('customer_id_lm', lm)
       .maybeSingle()
       .then(({ data }) => {
@@ -470,8 +470,14 @@ export default function SubscriptionDetails() {
             </p>
             <p className="text-sm text-gray-600">
               {overview.customer_contact}
+              {customerExtras?.alternate_contact ? ` · Alt: ${customerExtras.alternate_contact}` : ''}
               {customerExtras?.google_email ? ` · ${customerExtras.google_email}` : ''}
             </p>
+            {(customerExtras?.gender || customerExtras?.date_of_birth) && (
+              <p className="text-sm text-gray-500">
+                {[customerExtras?.gender, customerExtras?.date_of_birth ? `DOB: ${customerExtras.date_of_birth}` : null].filter(Boolean).join(' · ')}
+              </p>
+            )}
             <p className="text-sm text-gray-500">{overview.customer_address}</p>
           </div>
         </div>

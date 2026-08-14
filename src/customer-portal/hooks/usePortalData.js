@@ -12,6 +12,7 @@ export function usePortalData(customer, supabase) {
     deliveries: [],
     transactions: [],
     messages: [],
+    menuItems: [],
     business: FALLBACK_BUSINESS,
   })
   const [loading, setLoading] = useState(true)
@@ -50,8 +51,14 @@ export function usePortalData(customer, supabase) {
         .order('created_at', { ascending: false })
         .limit(5)
 
-      const [subRes, ordersRes, bizRes, msgRes] = await Promise.all([subPromise, ordersPromise, bizPromise, msgPromise])
-      const firstErr = subRes.error || ordersRes.error || bizRes.error || msgRes.error
+      const menuPromise = supabase
+        .from('menu_items')
+        .select('id, name, dietary_type, price')
+        .eq('active', true)
+        .order('name')
+
+      const [subRes, ordersRes, bizRes, msgRes, menuRes] = await Promise.all([subPromise, ordersPromise, bizPromise, msgPromise, menuPromise])
+      const firstErr = subRes.error || ordersRes.error || bizRes.error || msgRes.error || menuRes.error
       if (firstErr) throw firstErr
 
       const orderIds = (ordersRes.data ?? []).map((o) => o.id)
@@ -87,6 +94,7 @@ export function usePortalData(customer, supabase) {
         deliveries,
         transactions,
         messages: msgRes.data ?? [],
+        menuItems: menuRes.data ?? [],
         business: bizRes.data?.value ?? FALLBACK_BUSINESS,
       })
     } catch (e) {
@@ -117,6 +125,50 @@ export function usePortalData(customer, supabase) {
     [supabase, load]
   )
 
+  // Change the meal for a single future pending delivery (business rule:
+  // locked on the delivery day itself and after).
+  const changeMeal = useCallback(
+    async (delivery, menuItem) => {
+      if (delivery.status !== 'pending' || delivery.scheduled_date <= todayISO()) {
+        throw new Error('This delivery can no longer be changed.')
+      }
+      const { data: updated, error: upErr } = await supabase
+        .from('deliveries')
+        .update({ menu_item_id: menuItem.id, meal_name_snapshot: menuItem.name })
+        .eq('id', delivery.id)
+        .eq('status', 'pending')
+        .select()
+      if (upErr) throw upErr
+      if (!updated || updated.length === 0) throw new Error('This delivery was already updated.')
+      await load()
+    },
+    [supabase, load]
+  )
+
+  // Reschedule a future pending delivery to a new date (locked on the
+  // delivery day itself and after).
+  const rescheduleDelivery = useCallback(
+    async (delivery, newDate) => {
+      const today = todayISO()
+      if (delivery.status !== 'pending' || delivery.scheduled_date <= today) {
+        throw new Error('This delivery can no longer be rescheduled.')
+      }
+      if (!newDate || newDate <= today) {
+        throw new Error('Please pick a future date.')
+      }
+      const { data: updated, error: upErr } = await supabase
+        .from('deliveries')
+        .update({ scheduled_date: newDate })
+        .eq('id', delivery.id)
+        .eq('status', 'pending')
+        .select()
+      if (upErr) throw upErr
+      if (!updated || updated.length === 0) throw new Error('This delivery was already updated.')
+      await load()
+    },
+    [supabase, load]
+  )
+
   const sendKitchenMessage = useCallback(
     async ({ category, message }) => {
       const { error: insErr } = await supabase.from('customer_feedback').insert({
@@ -132,5 +184,5 @@ export function usePortalData(customer, supabase) {
     [customer, supabase, load]
   )
 
-  return { ...data, loading, error, refresh: load, skipDelivery, sendKitchenMessage }
+  return { ...data, loading, error, refresh: load, skipDelivery, sendKitchenMessage, changeMeal, rescheduleDelivery }
 }

@@ -1,9 +1,15 @@
 import { useState } from 'react'
-import { CalendarDays, CookingPot, SkipForward, X } from 'lucide-react'
+import { CalendarDays, CookingPot, SkipForward, X, UtensilsCrossed, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
 const todayISO = () => {
   const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const tomorrowISO = () => {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -77,13 +83,34 @@ function DeliveryRow({ delivery, isToday, onOpen }) {
   )
 }
 
-export default function ScheduleCard({ deliveries, skipDelivery }) {
+export default function ScheduleCard({ deliveries, skipDelivery, changeMeal, rescheduleDelivery, menuItems }) {
   const [selected, setSelected] = useState(null)
   const [confirmingSkip, setConfirmingSkip] = useState(false)
   const [skipping, setSkipping] = useState(false)
+  const [mealChoice, setMealChoice] = useState('')
+  const [changingMeal, setChangingMeal] = useState(false)
+  const [newDate, setNewDate] = useState('')
+  const [rescheduling, setRescheduling] = useState(false)
   const today = todayISO()
 
-  const canSkip = (d) => d && d.status === 'pending' && d.scheduled_date > today
+  const isFuturePending = (d) => d && d.status === 'pending' && d.scheduled_date > today
+  const isTodayPending = (d) => d && d.status === 'pending' && d.scheduled_date === today
+  const isPastPending = (d) => d && d.status === 'pending' && d.scheduled_date < today
+
+  const openDetail = (d) => {
+    setSelected(d)
+    setConfirmingSkip(false)
+    setMealChoice('')
+    setNewDate('')
+  }
+
+  const closeDetail = () => {
+    if (skipping || changingMeal || rescheduling) return
+    setSelected(null)
+    setConfirmingSkip(false)
+    setMealChoice('')
+    setNewDate('')
+  }
 
   const confirmSkip = async () => {
     if (!selected) return
@@ -97,6 +124,38 @@ export default function ScheduleCard({ deliveries, skipDelivery }) {
       toast.error("We couldn't skip this meal. Please try again.")
     } finally {
       setSkipping(false)
+    }
+  }
+
+  const applyMealChange = async () => {
+    if (!selected || !mealChoice) return
+    const item = (menuItems ?? []).find((m) => m.id === mealChoice)
+    if (!item) return
+    setChangingMeal(true)
+    try {
+      await changeMeal(selected, item)
+      toast.success('Meal updated', { description: `${item.name} is now scheduled for ${fmtDay(selected.scheduled_date)}.` })
+      setSelected(null)
+      setMealChoice('')
+    } catch (err) {
+      toast.error(err.message || "We couldn't change this meal. Please try again.")
+    } finally {
+      setChangingMeal(false)
+    }
+  }
+
+  const applyReschedule = async () => {
+    if (!selected || !newDate) return
+    setRescheduling(true)
+    try {
+      await rescheduleDelivery(selected, newDate)
+      toast.success('Delivery rescheduled', { description: `Moved to ${fmtDay(newDate)}.` })
+      setSelected(null)
+      setNewDate('')
+    } catch (err) {
+      toast.error(err.message || "We couldn't reschedule this delivery. Please try again.")
+    } finally {
+      setRescheduling(false)
     }
   }
 
@@ -116,7 +175,7 @@ export default function ScheduleCard({ deliveries, skipDelivery }) {
       ) : (
         <div className="space-y-3 lmp-stagger">
           {deliveries.map((d) => (
-            <DeliveryRow key={d.id} delivery={d} isToday={d.scheduled_date === today} onOpen={setSelected} />
+            <DeliveryRow key={d.id} delivery={d} isToday={d.scheduled_date === today} onOpen={openDetail} />
           ))}
         </div>
       )}
@@ -125,10 +184,10 @@ export default function ScheduleCard({ deliveries, skipDelivery }) {
         <div
           className="lmp-overlay fixed inset-0 z-[100] flex items-center justify-center p-4"
           style={{ background: 'rgba(26,36,32,0.35)', backdropFilter: 'blur(4px)' }}
-          onClick={() => !skipping && (setSelected(null), setConfirmingSkip(false))}
+          onClick={closeDetail}
         >
           <div
-            className="lmp-modal bg-white rounded-2xl border border-[#E5E2DA] shadow-2xl max-w-md w-full p-6"
+            className="lmp-modal bg-white rounded-2xl border border-[#E5E2DA] shadow-2xl max-w-md w-full p-6 max-h-[85vh] overflow-y-auto"
             data-testid="delivery-detail-dialog"
             onClick={(e) => e.stopPropagation()}
           >
@@ -142,7 +201,7 @@ export default function ScheduleCard({ deliveries, skipDelivery }) {
               <button
                 data-testid="delivery-detail-close"
                 className="lmp-btn-ghost !min-h-[36px] !px-2"
-                onClick={() => (setSelected(null), setConfirmingSkip(false))}
+                onClick={closeDetail}
                 aria-label="Close"
               >
                 <X size={16} />
@@ -168,29 +227,102 @@ export default function ScheduleCard({ deliveries, skipDelivery }) {
               )}
             </div>
 
-            {canSkip(selected) && !confirmingSkip && (
-              <button
-                data-testid={`delivery-skip-button-${selected.id}`}
-                className="lmp-btn-amber w-full"
-                onClick={() => setConfirmingSkip(true)}
-              >
-                <SkipForward size={13} /> Skip this day
-              </button>
+            {isFuturePending(selected) && (
+              <div className="space-y-3">
+                <div>
+                  <label className="lmp-label" htmlFor="delivery-change-meal-select">
+                    <span className="inline-flex items-center gap-1.5"><UtensilsCrossed size={12} /> Change meal</span>
+                  </label>
+                  <div className="flex gap-2.5">
+                    <select
+                      id="delivery-change-meal-select"
+                      data-testid="delivery-change-meal-select"
+                      className="lmp-field"
+                      value={mealChoice}
+                      onChange={(e) => setMealChoice(e.target.value)}
+                    >
+                      <option value="">Choose a different meal…</option>
+                      {(menuItems ?? []).map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      data-testid="delivery-change-meal-apply"
+                      className="lmp-btn-primary !min-h-[40px] !py-2 text-xs shrink-0"
+                      disabled={!mealChoice || changingMeal}
+                      onClick={applyMealChange}
+                    >
+                      {changingMeal ? 'Saving…' : 'Apply'}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[#A8B3AC] mt-1.5 mb-0">Meals can be changed until the day before delivery.</p>
+                </div>
+
+                <div className="h-px bg-[#E5E2DA]" />
+
+                <div>
+                  <label className="lmp-label" htmlFor="delivery-reschedule-date">
+                    <span className="inline-flex items-center gap-1.5"><CalendarDays size={12} /> Change date</span>
+                  </label>
+                  <div className="flex gap-2.5">
+                    <input
+                      id="delivery-reschedule-date"
+                      type="date"
+                      data-testid="delivery-reschedule-date"
+                      className="lmp-field"
+                      value={newDate}
+                      min={tomorrowISO()}
+                      onChange={(e) => setNewDate(e.target.value)}
+                    />
+                    <button
+                      data-testid="delivery-reschedule-apply"
+                      className="lmp-btn-primary !min-h-[40px] !py-2 text-xs shrink-0"
+                      disabled={!newDate || rescheduling}
+                      onClick={applyReschedule}
+                    >
+                      {rescheduling ? 'Saving…' : 'Apply'}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[#A8B3AC] mt-1.5 mb-0">Deliveries can be rescheduled until the day before.</p>
+                </div>
+
+                <div className="h-px bg-[#E5E2DA]" />
+
+                {!confirmingSkip ? (
+                  <button
+                    data-testid={`delivery-skip-button-${selected.id}`}
+                    className="lmp-btn-amber w-full"
+                    onClick={() => setConfirmingSkip(true)}
+                  >
+                    <SkipForward size={13} /> Skip this day
+                  </button>
+                ) : (
+                  <div data-testid="confirm-pause-dialog" className="border border-amber-700/20 bg-amber-700/5 rounded-xl p-4">
+                    <p className="text-sm text-[#1A2420] font-medium mt-0 mb-1">Skip this delivery?</p>
+                    <p className="text-xs text-[#526058] mb-4 m-0">Your meal credit is preserved and your plan extends by one day.</p>
+                    <div className="flex justify-end gap-2.5">
+                      <button data-testid="skip-cancel-button" className="lmp-btn-secondary !min-h-[38px] !py-1.5 text-xs" disabled={skipping} onClick={() => setConfirmingSkip(false)}>
+                        Keep meal
+                      </button>
+                      <button data-testid="skip-confirm-button" className="lmp-btn-primary !min-h-[38px] !py-1.5 text-xs" disabled={skipping} onClick={confirmSkip}>
+                        {skipping ? 'Skipping…' : 'Yes, skip day'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
-            {canSkip(selected) && confirmingSkip && (
-              <div data-testid="confirm-pause-dialog" className="border border-amber-700/20 bg-amber-700/5 rounded-xl p-4">
-                <p className="text-sm text-[#1A2420] font-medium mt-0 mb-1">Skip this delivery?</p>
-                <p className="text-xs text-[#526058] mb-4 m-0">Your meal credit is preserved and your plan extends by one day.</p>
-                <div className="flex justify-end gap-2.5">
-                  <button data-testid="skip-cancel-button" className="lmp-btn-secondary !min-h-[38px] !py-1.5 text-xs" disabled={skipping} onClick={() => setConfirmingSkip(false)}>
-                    Keep meal
-                  </button>
-                  <button data-testid="skip-confirm-button" className="lmp-btn-primary !min-h-[38px] !py-1.5 text-xs" disabled={skipping} onClick={confirmSkip}>
-                    {skipping ? 'Skipping…' : 'Yes, skip day'}
-                  </button>
-                </div>
-              </div>
+            {isTodayPending(selected) && (
+              <p className="text-xs text-[#808D85] flex items-center gap-1.5 m-0" data-testid="delivery-locked-note">
+                <Lock size={12} /> Delivery day — this meal is being prepared and can no longer be changed or skipped.
+              </p>
+            )}
+
+            {isPastPending(selected) && (
+              <p className="text-xs text-[#808D85] flex items-center gap-1.5 m-0" data-testid="delivery-passed-note">
+                <Lock size={12} /> This delivery date has passed. Contact Lunchmate to reschedule or adjust your plan.
+              </p>
             )}
           </div>
         </div>

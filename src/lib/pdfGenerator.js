@@ -39,9 +39,15 @@ async function getInvoiceSettings() {
   }
 }
 
+// jsPDF built-in fonts only support WinAnsi (Latin-1). Sanitize every
+// string: map common non-Latin punctuation to ASCII, then drop the rest.
 const cleanText = (value) =>
   String(value || '')
-    .replace(/[   ﻿]/g, ' ')
+    .replace(/[\u060C\u061B]/g, ',')
+    .replace(/[\u201C\u201D\u201E]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/[^\u0020-\u007E\u00A0-\u00FF]/g, ' ')
     .replace(/[\r\n\t]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

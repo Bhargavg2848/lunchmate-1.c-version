@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { UtensilsCrossed } from 'lucide-react'
 
 export default function CreditsCard({ subscription }) {
@@ -43,6 +44,13 @@ export default function CreditsCard({ subscription }) {
       <p className="mt-3 text-xs text-[#808D85] m-0">
         {used} used{nextDelivery ? ` · next delivery ${nextDelivery}` : ''}
       </p>
+      <Link
+        to="/subscription"
+        data-testid="credits-view-subscription-link"
+        className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-[#2E5B44] hover:text-[#1E3A2B] no-underline transition-colors"
+      >
+        View full subscription details →
+      </Link>
     </section>
   )
 }

@@ -11,6 +11,7 @@ import { usePortalData } from '../hooks/usePortalData'
 
 const DIETARY_OPTIONS = ['Vegetarian', 'Vegan', 'Jain', 'No onion & garlic', 'Gluten-free', 'Egg-free']
 const SPICE_OPTIONS = ['Mild', 'Medium', 'Spicy', 'Extra spicy']
+const GENDER_OPTIONS = ['Female', 'Male', 'Other', 'Prefer not to say']
 
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'
@@ -34,9 +35,15 @@ export default function PortalProfile() {
 
   useEffect(() => {
     if (customer && !form) {
+      const nameParts = (customer.name ?? '').trim().split(/\s+/)
       setForm({
+        first_name: customer.first_name ?? nameParts[0] ?? '',
+        last_name: customer.last_name ?? nameParts.slice(1).join(' ') ?? '',
         name: customer.name ?? '',
         phone: customer.contact ?? '',
+        alternate_contact: customer.alternate_contact ?? '',
+        gender: customer.gender ?? '',
+        date_of_birth: customer.date_of_birth ?? '',
         address: customer.address ?? '',
         delivery_instructions: customer.delivery_instructions ?? '',
         dietary_preferences: customer.dietary_preferences ?? [],
@@ -116,21 +123,38 @@ export default function PortalProfile() {
     e.preventDefault()
     setSaving(true)
     try {
+      const fullName = [form.first_name, form.last_name].map((s) => s.trim()).filter(Boolean).join(' ')
       const payload = {
-        name: form.name || null,
+        name: fullName || form.name || null,
+        first_name: form.first_name.trim() || null,
+        last_name: form.last_name.trim() || null,
+        gender: form.gender || null,
+        date_of_birth: form.date_of_birth || null,
         contact: form.phone || null,
+        alternate_contact: form.alternate_contact.trim() || null,
         address: form.address || null,
         delivery_instructions: form.delivery_instructions || null,
         dietary_preferences: form.dietary_preferences,
         spice_preference: form.spice_preference || null,
         allergies: form.allergies.split(',').map((s) => s.trim()).filter(Boolean),
       }
-      const { data, error: upErr } = await supabase
+      // first_name/last_name columns may not exist yet — retry without them
+      let { data, error: upErr } = await supabase
         .from('customers')
         .update(payload)
         .eq('id', customer.id)
         .select()
         .single()
+      if (upErr && /first_name|last_name/.test(upErr.message || '')) {
+        delete payload.first_name
+        delete payload.last_name
+        ;({ data, error: upErr } = await supabase
+          .from('customers')
+          .update(payload)
+          .eq('id', customer.id)
+          .select()
+          .single())
+      }
       if (upErr) throw upErr
       setCustomer(data)
 
@@ -169,9 +193,13 @@ export default function PortalProfile() {
   const email = user?.primaryEmailAddress?.emailAddress || customer?.google_email || ''
 
   const checks = [
-    { key: 'name', label: 'Add your full name', done: !!form.name.trim() },
+    { key: 'first_name', label: 'Add your first name', done: !!form.first_name.trim() },
+    { key: 'last_name', label: 'Add your last name', done: !!form.last_name.trim() },
     { key: 'photo', label: 'Add a profile photo', done: !!(customer.image_url || user?.imageUrl) },
+    { key: 'gender', label: 'Select your gender', done: !!form.gender },
+    { key: 'dob', label: 'Add your date of birth', done: !!form.date_of_birth },
     { key: 'phone', label: 'Add your phone number', done: !!form.phone.trim() },
+    { key: 'alt_phone', label: 'Add an alternate contact', done: !!form.alternate_contact.trim() },
     { key: 'address', label: 'Add your delivery address', done: !!form.address.trim() },
     { key: 'instructions', label: 'Add delivery instructions', done: !!form.delivery_instructions.trim() },
     { key: 'diet', label: 'Choose dietary preferences', done: form.dietary_preferences.length > 0 },
@@ -252,12 +280,30 @@ export default function PortalProfile() {
           <section className="lmp-card p-5 sm:p-6" data-testid="profile-personal-section">
             <p className="lmp-caption mb-4">Personal Information</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Full name" testId="profile-name-input" value={form.name} onChange={set('name')} placeholder="Your full name" />
+              <Field label="First name" testId="profile-first-name-input" value={form.first_name} onChange={set('first_name')} placeholder="First name" />
+              <Field label="Last name" testId="profile-last-name-input" value={form.last_name} onChange={set('last_name')} placeholder="Last name" />
+              <div>
+                <label className="lmp-label" htmlFor="profile-gender-select">Gender</label>
+                <select
+                  id="profile-gender-select"
+                  data-testid="profile-gender-select"
+                  className="lmp-field"
+                  value={form.gender}
+                  onChange={set('gender')}
+                >
+                  <option value="">Select…</option>
+                  {GENDER_OPTIONS.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </div>
+              <Field label="Date of birth" testId="profile-dob-input" type="date" value={form.date_of_birth} onChange={set('date_of_birth')} max={new Date().toISOString().slice(0, 10)} />
+              <Field label="Phone number" testId="profile-phone-input" value={form.phone} onChange={set('phone')} placeholder="+91 …" inputMode="tel" />
+              <Field label="Alternate contact" testId="profile-alt-contact-input" value={form.alternate_contact} onChange={set('alternate_contact')} placeholder="Family / friend number" inputMode="tel" />
               <div>
                 <span className="lmp-label">Email</span>
                 <p className="text-sm text-[#1A2420] py-2.5 truncate m-0" data-testid="profile-email-readonly">{email}</p>
               </div>
-              <Field label="Phone number" testId="profile-phone-input" value={form.phone} onChange={set('phone')} placeholder="+91 …" inputMode="tel" />
               <div>
                 <span className="lmp-label">Customer ID</span>
                 <p className="text-sm text-[#808D85] py-2.5 font-mono m-0" data-testid="profile-customer-id">

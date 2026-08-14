@@ -54,7 +54,7 @@ export function useCustomer() {
         const patch = { clerk_user_id: user.id }
         if (!existing.name && fullName) patch.name = fullName
         if (!existing.google_email && email) patch.google_email = email
-        if (!existing.image_url && user.imageUrl) patch.image_url = user.imageUrl
+        if (user.imageUrl && existing.image_url !== user.imageUrl) patch.image_url = user.imageUrl
         const { data: updated, error: upErr } = await supabase
           .from('customers')
           .update(patch)

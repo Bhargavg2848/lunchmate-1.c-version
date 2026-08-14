@@ -66,7 +66,7 @@ export default function PortalDashboard() {
               <ReferralCard customer={customer} supabase={supabase} hasSubscription={!!portal.subscription} />
             </div>
 
-            <ScheduleCard deliveries={portal.deliveries} skipDelivery={portal.skipDelivery} />
+            <ScheduleCard deliveries={portal.deliveries} skipDelivery={portal.skipDelivery} menuItems={portal.menuItems} changeMeal={portal.changeMeal} rescheduleDelivery={portal.rescheduleDelivery} />
             <KitchenInbox messages={portal.messages} sendKitchenMessage={portal.sendKitchenMessage} />
 
             <p className="text-center text-xs text-[#A8B3AC] pt-2 pb-6" data-testid="dashboard-footer">
