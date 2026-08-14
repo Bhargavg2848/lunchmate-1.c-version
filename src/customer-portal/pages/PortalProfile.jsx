@@ -33,6 +33,7 @@ export default function PortalProfile() {
   useEffect(() => {
     if (customer && !form) {
       setForm({
+        name: customer.name ?? '',
         phone: customer.contact ?? '',
         address: customer.address ?? '',
         delivery_instructions: customer.delivery_instructions ?? '',
@@ -84,6 +85,7 @@ export default function PortalProfile() {
     setSaving(true)
     try {
       const payload = {
+        name: form.name || null,
         contact: form.phone || null,
         address: form.address || null,
         delivery_instructions: form.delivery_instructions || null,
@@ -160,10 +162,7 @@ export default function PortalProfile() {
           <section className="lmp-card p-5 sm:p-6" data-testid="profile-personal-section">
             <p className="lmp-caption mb-4">Personal Information</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <span className="lmp-label">Full name</span>
-                <p className="text-sm text-[#1A2420] py-2.5 m-0" data-testid="profile-name-readonly">{name}</p>
-              </div>
+              <Field label="Full name" testId="profile-name-input" value={form.name} onChange={set('name')} placeholder="Your full name" />
               <div>
                 <span className="lmp-label">Email</span>
                 <p className="text-sm text-[#1A2420] py-2.5 truncate m-0" data-testid="profile-email-readonly">{email}</p>

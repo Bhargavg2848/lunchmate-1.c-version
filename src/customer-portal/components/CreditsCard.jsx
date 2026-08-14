@@ -23,7 +23,7 @@ export default function CreditsCard({ subscription }) {
     : null
 
   return (
-    <section className="lmp-card p-5 sm:p-6" data-testid="credits-display-card">
+    <section className="lmp-card p-5 sm:p-6" id="subscription" data-testid="credits-display-card">
       <div className="flex items-center justify-between mb-4">
         <p className="lmp-caption m-0">Meal Credits</p>
         <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#F0F5F2] text-[#2E5B44]">

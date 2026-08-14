@@ -61,7 +61,7 @@ export function usePortalData(customer, supabase) {
           .from('deliveries')
           .select('id, order_id, scheduled_date, status, meal_name_snapshot, meal_slot, skip_reason')
           .in('order_id', orderIds)
-          .gte('scheduled_date', todayISO())
+          .or(`scheduled_date.gte.${todayISO()},status.eq.pending`)
           .order('scheduled_date', { ascending: true })
           .order('meal_slot', { ascending: true })
           .limit(10)

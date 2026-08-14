@@ -60,6 +60,7 @@ export default function SubscriptionDetails() {
   const orderId = params.orderId || params.id || window.location.hash.split('/').pop()
 
   const [overview, setOverview] = useState(null)
+  const [customerExtras, setCustomerExtras] = useState(null)
   const [timeline, setTimeline] = useState([])
   const [menuItems, setMenuItems] = useState([])
   const [paymentHistory, setPaymentHistory] = useState([])
@@ -99,6 +100,25 @@ export default function SubscriptionDetails() {
     const due = revised - projectedAmountReceived
     return due > 0 ? due : 0
   }, [overview?.revised_total_amount, projectedAmountReceived])
+
+  // Portal-linked identity (Google email + photo) for this customer
+  useEffect(() => {
+    const lm = overview?.customer_id_string
+    if (!lm) return
+    let cancelled = false
+    supabase
+      .from('customers')
+      .select('google_email, image_url')
+      .eq('customer_id_lm', lm)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setCustomerExtras(data || null)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [overview?.customer_id_string])
 
   const loadPaymentHistory = useCallback(async (overviewData) => {
     const candidates = ['order_payment_transactions', 'payment_transactions']
@@ -427,16 +447,33 @@ export default function SubscriptionDetails() {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-5">
-        <div>
-          <Link to="/subscriptions" className="text-sm text-green-700 hover:underline">
-            Back to subscriptions
-          </Link>
-          <h1 className="text-2xl font-bold mt-2">{overview.customer_name}</h1>
-          <p className="text-sm font-mono text-gray-500">
-            Customer ID: {overview.customer_id} | Order ID: {overview.order_id || overview.subscription_order_id}
-          </p>
-          <p className="text-sm text-gray-600">{overview.customer_contact}</p>
-          <p className="text-sm text-gray-500">{overview.customer_address}</p>
+        <div className="flex items-start gap-4">
+          {customerExtras?.image_url ? (
+            <img
+              src={customerExtras.image_url}
+              alt={overview.customer_name || 'Customer'}
+              className="w-14 h-14 rounded-full object-cover border border-gray-200 mt-1 shrink-0"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-full bg-green-700 text-white flex items-center justify-center text-lg font-bold mt-1 shrink-0">
+              {(overview.customer_name || 'C').slice(0, 1).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <Link to="/subscriptions" className="text-sm text-green-700 hover:underline">
+              Back to subscriptions
+            </Link>
+            <h1 className="text-2xl font-bold mt-2">{overview.customer_name}</h1>
+            <p className="text-sm font-mono text-gray-500">
+              Customer ID: {overview.customer_id} | Order ID: {overview.order_id || overview.subscription_order_id}
+            </p>
+            <p className="text-sm text-gray-600">
+              {overview.customer_contact}
+              {customerExtras?.google_email ? ` · ${customerExtras.google_email}` : ''}
+            </p>
+            <p className="text-sm text-gray-500">{overview.customer_address}</p>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

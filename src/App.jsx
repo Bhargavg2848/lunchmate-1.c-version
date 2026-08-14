@@ -10,6 +10,7 @@ import Subscriptions from './pages/Subscriptions.jsx';
 import SubscriptionDetails from './pages/SubscriptionDetails.jsx';
 import KitchenDashboard from './pages/KitchenDashboard.jsx';
 import AdminInbox from './components/AdminInbox.jsx';
+import AdminOffers from './pages/AdminOffers.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import CustomerPortalApp from './customer-portal/CustomerPortalApp.jsx';
 import DeliveryRoster from './pages/DeliveryRoster.jsx';
@@ -36,6 +37,7 @@ function AdminLayout({ children }) {
               <NavLink to="/deliveries" className={({ isActive }) => navClass(isActive)}>Deliveries</NavLink>
               <NavLink to="/kitchen" className={({ isActive }) => navClass(isActive)}>Kitchen</NavLink>
               <NavLink to="/inbox" className={({ isActive }) => navClass(isActive)}>Inbox</NavLink>
+              <NavLink to="/offers" className={({ isActive }) => navClass(isActive)}>Offers</NavLink>
               <NavLink to="/roster" className={({ isActive }) => navClass(isActive)}>Roster</NavLink>
               <NavLink to="/subscriptions" className={({ isActive }) => navClass(isActive)}>Subscriptions</NavLink>
               <NavLink to="/menu" className={({ isActive }) => navClass(isActive)}>Menu & Pricing</NavLink>
@@ -114,6 +116,7 @@ export default function App() {
               <Route path="/deliveries" element={<Deliveries />} />
               <Route path="/kitchen" element={<KitchenDashboard />} />
               <Route path="/inbox" element={<AdminInbox />} />
+              <Route path="/offers" element={<AdminOffers />} />
               <Route path="/roster" element={<DeliveryRoster />} />
               <Route path="/subscriptions" element={<Subscriptions />} />
               <Route path="/subscriptions/:orderId" element={<SubscriptionDetails />} />

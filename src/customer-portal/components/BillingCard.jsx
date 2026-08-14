@@ -1,4 +1,7 @@
-import { ReceiptText, ExternalLink } from 'lucide-react'
+import { useState } from 'react'
+import { ReceiptText, ExternalLink, FileDown } from 'lucide-react'
+import { toast } from 'sonner'
+import { generateSubscriptionInvoice } from '../../lib/pdfGenerator'
 
 const fmtINR = (amount) =>
   amount == null ? null : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(amount))
@@ -28,6 +31,19 @@ export default function BillingCard({ subscription, transactions }) {
   const stateClass = STATE_STYLES[state] ?? STATE_STYLES.completed
   const total = subscription.revised_total_amount ?? subscription.original_total_amount
   const invoiceTx = (transactions ?? []).find((t) => t.invoice_url)
+  const [generating, setGenerating] = useState(false)
+
+  const downloadInvoice = async () => {
+    setGenerating(true)
+    try {
+      const result = await generateSubscriptionInvoice(subscription)
+      if (result?.error) throw new Error(result.error)
+    } catch {
+      toast.error("We couldn't generate your invoice. Please try again.")
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   return (
     <section className="lmp-card p-5 sm:p-6" id="billing" data-testid="billing-section-card">
@@ -105,9 +121,14 @@ export default function BillingCard({ subscription, transactions }) {
             View Invoice <ExternalLink size={14} />
           </a>
         ) : (
-          <p className="text-sm text-[#808D85] m-0" data-testid="invoice-unavailable-note">
-            Invoice isn&apos;t available yet. It will appear here once Lunchmate attaches it to your payment.
-          </p>
+          <button
+            data-testid="view-invoice-button"
+            className="lmp-btn-primary"
+            onClick={downloadInvoice}
+            disabled={generating}
+          >
+            <FileDown size={14} /> {generating ? 'Preparing invoice…' : 'Download Invoice'}
+          </button>
         )}
       </div>
     </section>
