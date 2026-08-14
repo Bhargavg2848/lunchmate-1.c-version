@@ -87,19 +87,22 @@ export default function PortalProfile() {
     if (!file) return
     setUploadingPhoto(true)
     try {
+      const before = user.imageUrl
       await user.setProfileImage({ file })
       await user.reload?.()
       const url = user.imageUrl
-      if (url) {
-        const { data, error: upErr } = await supabase
-          .from('customers')
-          .update({ image_url: url })
-          .eq('id', customer.id)
-          .select()
-          .single()
-        if (upErr) throw upErr
-        if (data) setCustomer(data)
+      if (!url || url === before) {
+        toast.error("We couldn't update your photo. Please try again.")
+        return
       }
+      const { data, error: upErr } = await supabase
+        .from('customers')
+        .update({ image_url: url })
+        .eq('id', customer.id)
+        .select()
+        .single()
+      if (upErr) throw upErr
+      if (data) setCustomer(data)
       toast.success('Profile photo updated')
     } catch {
       toast.error("We couldn't update your photo. Please try again.")
