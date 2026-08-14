@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useState } from 'react'
 import { ReceiptText, ExternalLink, FileDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { generateSubscriptionInvoice } from '../../lib/pdfGenerator'
