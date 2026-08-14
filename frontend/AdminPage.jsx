@@ -27,7 +27,7 @@ export default function AdminPage() {
 
   if (!adminSession) {
     return (
-      <div style={{ maxWidth: '400px', margin: '40px auto', padding: '20px' }}>
+      <div style={{ maxWidth: '400px', margin: '40px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
         <h2>Admin Secure Login</h2>
         <Auth 
           supabaseClient={supabaseAdminClient} 
@@ -44,7 +44,7 @@ export default function AdminPage() {
       <p>Kitchen queue, user management, and system stats.</p>
       <button 
         onClick={() => supabaseAdminClient.auth.signOut()}
-        style={{ marginTop: '20px', padding: '10px', cursor: 'pointer' }}
+        style={{ marginTop: '20px', padding: '10px 20px', cursor: 'pointer', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px' }}
       >
         Sign Out Admin
       </button>
