@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { useUser } from "@clerk/clerk-react";
+import { useUser, useClerk } from "@clerk/clerk-react";
 import { supabase } from "../lib/supabase";
 
 export default function AccountLinkBridge({ onLinked }) {
   const { user } = useUser();
+  const { signOut } = useClerk();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [phoneObj, setPhoneObj] = useState(null);
@@ -17,12 +18,27 @@ export default function AccountLinkBridge({ onLinked }) {
     setError("");
     try {
       const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`;
-      const newPhone = await user.createPhoneNumber({ phoneNumber: formattedPhone });
-      await newPhone.prepareVerification();
-      setPhoneObj(newPhone);
+      
+      // 1. Check if the user already has this phone attached from a previous attempt
+      let phoneRecord = user.phoneNumbers.find(p => p.phoneNumber === formattedPhone);
+      
+      // 2. If it doesn't exist on their account yet, create it
+      if (!phoneRecord) {
+        phoneRecord = await user.createPhoneNumber({ phoneNumber: formattedPhone });
+      }
+
+      // 3. Trigger the SMS code
+      await phoneRecord.prepareVerification();
+      
+      setPhoneObj(phoneRecord);
       setStep(2);
     } catch (err) {
-      setError(err.errors?.[0]?.message || "Failed to send OTP. Please check the number.");
+      const errorMsg = err.errors?.[0]?.message || "";
+      if (errorMsg.toLowerCase().includes("reverification")) {
+        setError("For security, your session is too old to link a phone. Please Sign Out and log back in to try again.");
+      } else {
+        setError(errorMsg || "Failed to send OTP. Please check the number.");
+      }
     } finally {
       setLoading(false);
     }
@@ -80,9 +96,16 @@ export default function AccountLinkBridge({ onLinked }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-600 text-white font-semibold py-2 rounded-lg hover:bg-emerald-700 transition"
+              className="w-full bg-emerald-600 text-white font-semibold py-2 rounded-lg hover:bg-emerald-700 transition mb-3"
             >
               {loading ? "Sending..." : "Send Verification Code"}
+            </button>
+            <button
+              type="button"
+              onClick={() => signOut()}
+              className="w-full text-gray-500 hover:text-gray-800 text-sm font-medium transition"
+            >
+              Sign out & Try again
             </button>
           </form>
         ) : (
